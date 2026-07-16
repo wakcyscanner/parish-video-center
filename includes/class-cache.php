@@ -36,9 +36,38 @@ class SVC_Cache {
 	 * 'svc_purge_page_cache' action fired at the end.
 	 */
 	public static function purge_all() {
-		// WP Rocket.
+		// WP Rocket (also white-labeled as AccelerateWP). Page HTML, minified
+		// assets, and Used CSS are three separate caches; purging only the
+		// pages leaves stale optimized CSS styling the new markup.
 		if ( function_exists( 'rocket_clean_domain' ) ) {
 			rocket_clean_domain();
+
+			if ( function_exists( 'rocket_clean_minify' ) ) {
+				rocket_clean_minify();
+			}
+
+			// Used CSS (Remove Unused CSS) lives per-URL in the database and
+			// only contains selectors seen when the page was analyzed — new
+			// CSS classes stay unstyled until it is truncated and rebuilt.
+			$container = apply_filters( 'rocket_container', null );
+			if ( is_object( $container ) && method_exists( $container, 'get' ) ) {
+				foreach ( array( 'rucss_used_css_controller', 'rucss_admin' ) as $service ) {
+					try {
+						$controller = $container->get( $service );
+						if ( is_object( $controller ) && method_exists( $controller, 'truncate_used_css' ) ) {
+							$controller->truncate_used_css();
+							break;
+						}
+					} catch ( \Throwable $e ) {
+						// Service names vary across WP Rocket builds; try the next.
+					}
+				}
+			}
+		}
+
+		// Autoptimize (CSS/JS optimizer often paired with a page cache).
+		if ( class_exists( 'autoptimizeCache' ) && method_exists( 'autoptimizeCache', 'clearall' ) ) {
+			autoptimizeCache::clearall();
 		}
 
 		// W3 Total Cache.

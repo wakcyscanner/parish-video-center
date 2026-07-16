@@ -4,7 +4,7 @@ Tags: vimeo, video, sermons, homilies, church
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.3.1
+Stable tag: 1.3.2
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -55,6 +55,9 @@ The plugin purges the major page caches (WP Rocket, W3 Total Cache, WP Super Cac
 Plugin options and scheduled events are removed. Video posts and sideloaded media are left in place.
 
 == Changelog ==
+
+= 1.3.2 =
+* WP Rocket-based caches (including AccelerateWP) now also get their minified assets and Used CSS (Remove Unused CSS) cleared, not just the page cache — stale optimized CSS was leaving new layouts unstyled for logged-out visitors. Autoptimize's asset cache is cleared too.
 
 = 1.3.1 =
 * Page caches are now purged automatically when the plugin changes public pages: after a sync that created, updated, unpublished, or re-thumbnailed anything; once after a plugin update (new templates/styles); and after saving settings. Supports the major cache plugins and hosts, with a svc_purge_page_cache action for anything else.
