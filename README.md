@@ -14,6 +14,7 @@ Videos become real WordPress posts (a custom post type), so they get permalinks,
 - **Safe sync semantics** — videos removed from the showcase are unpublished (drafted), never deleted, and re-publish if they return. A per-video *"Don't overwrite with Vimeo data"* lock protects manual edits.
 - **SEO** — VideoObject JSON-LD on single pages, ItemList JSON-LD on the archive. Thumbnails are sideloaded into the media library.
 - **Deep links** — `/your-slug/?v=<vimeo-id>` 301s to the matching video page.
+- **Cache-aware** — automatically purges the major page caches (WP Rocket, W3TC, WP Super Cache, LiteSpeed, WP Engine, and more) after content-changing syncs, plugin updates, and settings changes; other setups can hook `svc_purge_page_cache`.
 
 ## Installation
 

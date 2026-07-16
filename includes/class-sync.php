@@ -90,11 +90,12 @@ class SVC_Sync {
 			}
 		}
 
-		$created = 0;
-		$updated = 0;
-		$drafted = 0;
-		$locked  = 0;
-		$seen    = array();
+		$created    = 0;
+		$updated    = 0;
+		$drafted    = 0;
+		$locked     = 0;
+		$thumbnails = 0;
+		$seen       = array();
 
 		foreach ( $videos as $video ) {
 			$vimeo_id = self::extract_id( isset( $video['uri'] ) ? $video['uri'] : '' );
@@ -161,6 +162,7 @@ class SVC_Sync {
 				if ( $attachment_id ) {
 					set_post_thumbnail( $post_id, $attachment_id );
 					update_post_meta( $post_id, '_vimeo_thumbnail_src', $thumbnail );
+					$thumbnails++;
 				}
 			}
 		}
@@ -197,6 +199,11 @@ class SVC_Sync {
 			),
 			false
 		);
+
+		// Sync writes posts programmatically, which page caches don't notice.
+		if ( $created + $updated + $drafted + $thumbnails > 0 ) {
+			SVC_Cache::purge_all();
+		}
 
 		return true;
 	}

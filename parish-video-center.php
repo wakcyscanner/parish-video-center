@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Parish Video Center
  * Description: Syncs a Vimeo showcase into WordPress video posts with a gallery archive, single video pages, and VideoObject structured data. Post labels and URL slug are configurable (Homilies, Sermons, Messages, …).
- * Version: 1.3.0
+ * Version: 1.3.1
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Author: St. Paul the Apostle Catholic Church
@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'SVC_VERSION', '1.3.0' );
+define( 'SVC_VERSION', '1.3.1' );
 define( 'SVC_PLUGIN_FILE', __FILE__ );
 define( 'SVC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SVC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -25,12 +25,14 @@ require_once SVC_PLUGIN_DIR . 'includes/class-sync.php';
 require_once SVC_PLUGIN_DIR . 'includes/class-settings.php';
 require_once SVC_PLUGIN_DIR . 'includes/class-structured-data.php';
 require_once SVC_PLUGIN_DIR . 'includes/class-redirects.php';
+require_once SVC_PLUGIN_DIR . 'includes/class-cache.php';
 
 SVC_Post_Type::init();
 SVC_Sync::init();
 SVC_Settings::init();
 SVC_Structured_Data::init();
 SVC_Redirects::init();
+SVC_Cache::init();
 
 /**
  * Get plugin settings merged with defaults.

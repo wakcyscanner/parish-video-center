@@ -4,7 +4,7 @@ Tags: vimeo, video, sermons, homilies, church
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.3.0
+Stable tag: 1.3.1
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -46,11 +46,18 @@ No. When a video leaves the showcase, its post is set back to draft. Nothing is 
 
 Yes — check "Don't overwrite with Vimeo data" in the Vimeo Sync box on the edit screen, or sync will overwrite your changes on its next run.
 
+= Visitors see an outdated page even though the videos updated =
+
+The plugin purges the major page caches (WP Rocket, W3 Total Cache, WP Super Cache, WP Fastest Cache, LiteSpeed, SiteGround Optimizer, Cache Enabler, Breeze, Hummingbird, Nginx Helper, Comet Cache, WP Engine, Pantheon) automatically after every sync that changes content, after a plugin update, and after saving settings. If your cache isn't on that list, hook the `svc_purge_page_cache` action and clear it there.
+
 = What happens on uninstall? =
 
 Plugin options and scheduled events are removed. Video posts and sideloaded media are left in place.
 
 == Changelog ==
+
+= 1.3.1 =
+* Page caches are now purged automatically when the plugin changes public pages: after a sync that created, updated, unpublished, or re-thumbnailed anything; once after a plugin update (new templates/styles); and after saving settings. Supports the major cache plugins and hosts, with a svc_purge_page_cache action for anything else.
 
 = 1.3.0 =
 * The archive landing page is now a video hub: split hero (player left; "Latest" badge, title, date/duration, short excerpt, and an Up Next list right), a "Browse all" section heading, and duration badges on all thumbnail tiles.

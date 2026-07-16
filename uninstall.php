@@ -11,6 +11,7 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 delete_option( 'svc_settings' );
 delete_option( 'svc_last_sync' );
 delete_option( 'svc_flush_rewrite' );
+delete_option( 'svc_version' );
 delete_transient( 'svc_test_result' );
 
 wp_clear_scheduled_hook( 'svc_sync_event' );
