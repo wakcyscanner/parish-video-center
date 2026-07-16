@@ -37,6 +37,7 @@ while ( have_posts() ) :
 						?></a>
 					</p>
 				</div>
+				<?php svc_render_related( get_the_ID() ); ?>
 			</article>
 		</main>
 	</div>

@@ -4,7 +4,7 @@ Tags: vimeo, video, sermons, homilies, church
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.1.0
+Stable tag: 1.2.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -17,6 +17,7 @@ Parish Video Center keeps a WordPress site in sync with a Vimeo showcase — per
 * Automatic sync on a WP-Cron schedule (hourly, twice daily, daily, or weekly), plus a manual Sync Now button.
 * Configurable naming: call your videos Homilies, Sermons, Messages — labels and the archive URL slug are settings.
 * Gallery archive page with the newest video as a hero, then a thumbnail grid with pagination.
+* "More videos" recirculation grid at the bottom of every single video page, with thumbnail previews of other recent videos.
 * Click-to-play player facade: pages load a poster image, and the Vimeo iframe is only injected on click (fast pages, no third-party requests until the visitor opts in; dnt=1 is set on the player).
 * Videos removed from the showcase are unpublished (drafted), never deleted. Videos that return are re-published.
 * Per-video "Don't overwrite with Vimeo data" lock so editors can customize a title, description, or thumbnail without sync reverting it.
@@ -50,6 +51,9 @@ Yes — check "Don't overwrite with Vimeo data" in the Vimeo Sync box on the edi
 Plugin options and scheduled events are removed. Video posts and sideloaded media are left in place.
 
 == Changelog ==
+
+= 1.2.0 =
+* Recirculation module at the bottom of single video pages: a thumbnail grid of up to four other recent videos plus a link to the full gallery. Filterable via the svc_related_count hook (return 0 to disable).
 
 = 1.1.0 =
 * Generalized for any church: configurable video labels and archive slug.

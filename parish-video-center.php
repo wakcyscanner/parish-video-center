@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Parish Video Center
  * Description: Syncs a Vimeo showcase into WordPress video posts with a gallery archive, single video pages, and VideoObject structured data. Post labels and URL slug are configurable (Homilies, Sermons, Messages, …).
- * Version: 1.1.0
+ * Version: 1.2.0
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Author: St. Paul the Apostle Catholic Church
@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'SVC_VERSION', '1.1.0' );
+define( 'SVC_VERSION', '1.2.0' );
 define( 'SVC_PLUGIN_FILE', __FILE__ );
 define( 'SVC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SVC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -133,6 +133,58 @@ function svc_render_description( $post ) {
 	}
 
 	return wp_kses_post( wpautop( make_clickable( esc_html( $text ) ) ) );
+}
+
+/**
+ * Render the recirculation module: a grid of other recent videos with
+ * thumbnail tiles, shown at the bottom of single video pages. The count
+ * is filterable via 'svc_related_count'; 0 disables the module.
+ */
+function svc_render_related( $post_id, $count = 4 ) {
+	$count = (int) apply_filters( 'svc_related_count', $count, $post_id );
+	if ( $count < 1 ) {
+		return;
+	}
+
+	$related = get_posts(
+		array(
+			'post_type'      => SVC_Post_Type::POST_TYPE,
+			'post_status'    => 'publish',
+			'posts_per_page' => $count,
+			'post__not_in'   => array( (int) $post_id ),
+			'no_found_rows'  => true,
+		)
+	);
+
+	if ( ! $related ) {
+		return;
+	}
+
+	$settings = svc_get_settings();
+	$plural   = '' !== trim( $settings['plural'] ) ? $settings['plural'] : 'Videos';
+	/* translators: %s: plural video label */
+	$heading = sprintf( __( 'More %s', 'parish-video-center' ), $plural );
+	?>
+	<aside class="svc-related" aria-label="<?php echo esc_attr( $heading ); ?>">
+		<h2 class="svc-related-title"><?php echo esc_html( $heading ); ?></h2>
+		<div class="svc-gallery">
+			<?php foreach ( $related as $related_post ) : ?>
+				<a href="<?php echo esc_url( get_permalink( $related_post ) ); ?>" class="svc-thumbnail">
+					<?php if ( has_post_thumbnail( $related_post ) ) : ?>
+						<?php echo get_the_post_thumbnail( $related_post, 'medium_large', array( 'class' => 'svc-thumb-img', 'loading' => 'lazy' ) ); ?>
+					<?php endif; ?>
+					<div class="svc-thumb-title"><?php echo esc_html( get_the_title( $related_post ) ); ?></div>
+				</a>
+			<?php endforeach; ?>
+		</div>
+		<p class="svc-related-all">
+			<a href="<?php echo esc_url( get_post_type_archive_link( SVC_Post_Type::POST_TYPE ) ); ?>"><?php
+				/* translators: %s: plural video label */
+				echo esc_html( sprintf( __( 'View all %s', 'parish-video-center' ), $plural ) );
+			?> &rarr;</a>
+		</p>
+	</aside>
+	<?php
 }
 
 /**

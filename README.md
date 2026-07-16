@@ -9,6 +9,7 @@ Videos become real WordPress posts (a custom post type), so they get permalinks,
 - **Automatic sync** on a WP-Cron schedule (hourly, twice daily, daily, or weekly), plus a manual *Sync Now* button and a *Test Connection* check.
 - **Your vocabulary** — call them Homilies, Sermons, or Messages: the post labels and the archive URL slug are settings.
 - **Gallery archive** with the newest video as a hero, then a paginated thumbnail grid; clean single-video pages. A theme can override either template (`archive-svc_video.php` / `single-svc_video.php`).
+- **Recirculation** — every single video page ends with a thumbnail grid of other recent videos and a link to the full gallery (count filterable via `svc_related_count`; return `0` to disable).
 - **Click-to-play facade** — pages load only a poster image; the Vimeo iframe is injected on click (`dnt=1` set on the player), so no third-party requests until the visitor opts in.
 - **Safe sync semantics** — videos removed from the showcase are unpublished (drafted), never deleted, and re-publish if they return. A per-video *"Don't overwrite with Vimeo data"* lock protects manual edits.
 - **SEO** — VideoObject JSON-LD on single pages, ItemList JSON-LD on the archive. Thumbnails are sideloaded into the media library.

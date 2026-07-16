@@ -191,6 +191,33 @@
 	-webkit-box-orient: vertical;
 }
 
+/* Recirculation module on single video pages */
+.svc-related {
+	margin-top: 2.5rem;
+	padding-top: 1.5rem;
+	border-top: 1px solid #e5e5e5;
+}
+
+.svc-related-title {
+	font-size: 1.25rem;
+	font-weight: 700;
+	margin: 0 0 1rem 0;
+}
+
+.svc-related-all {
+	margin: 0.5rem 0 0 0;
+}
+
+.svc-related-all a {
+	color: #00adef;
+	text-decoration: none;
+	font-weight: 600;
+}
+
+.svc-related-all a:hover {
+	text-decoration: underline;
+}
+
 /* Pagination (WP the_posts_pagination markup) */
 .svc-wrap .navigation.pagination {
 	display: flex;
@@ -259,6 +286,7 @@
 /* Print */
 @media print {
 	.svc-play,
+	.svc-related,
 	.svc-wrap .navigation.pagination {
 		display: none;
 	}
