@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Parish Video Center
  * Description: Syncs a Vimeo showcase into WordPress video posts with a gallery archive, single video pages, and VideoObject structured data. Post labels and URL slug are configurable (Homilies, Sermons, Messages, …).
- * Version: 1.2.0
+ * Version: 1.3.0
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Author: St. Paul the Apostle Catholic Church
@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'SVC_VERSION', '1.2.0' );
+define( 'SVC_VERSION', '1.3.0' );
 define( 'SVC_PLUGIN_FILE', __FILE__ );
 define( 'SVC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SVC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -136,6 +136,54 @@ function svc_render_description( $post ) {
 }
 
 /**
+ * Human-readable duration for display, e.g. "32 min" or "1 hr 5 min".
+ */
+function svc_human_duration( $seconds ) {
+	$seconds = (int) $seconds;
+	if ( $seconds <= 0 ) {
+		return '';
+	}
+
+	$hours   = (int) floor( $seconds / 3600 );
+	$minutes = (int) round( ( $seconds % 3600 ) / 60 );
+	if ( 60 === $minutes ) {
+		$hours++;
+		$minutes = 0;
+	}
+
+	if ( $hours > 0 ) {
+		if ( $minutes > 0 ) {
+			/* translators: 1: hours, 2: minutes */
+			return sprintf( __( '%1$d hr %2$d min', 'parish-video-center' ), $hours, $minutes );
+		}
+		/* translators: %d: number of hours */
+		return sprintf( __( '%d hr', 'parish-video-center' ), $hours );
+	}
+
+	/* translators: %d: number of minutes */
+	return sprintf( __( '%d min', 'parish-video-center' ), max( 1, $minutes ) );
+}
+
+/**
+ * Render one thumbnail tile: poster, duration chip, title overlay.
+ * Shared by the archive grid and the recirculation module.
+ */
+function svc_render_tile( $tile_post ) {
+	$duration = svc_human_duration( get_post_meta( $tile_post->ID, '_vimeo_duration', true ) );
+	?>
+	<a href="<?php echo esc_url( get_permalink( $tile_post ) ); ?>" class="svc-thumbnail">
+		<?php if ( has_post_thumbnail( $tile_post ) ) : ?>
+			<?php echo get_the_post_thumbnail( $tile_post, 'medium_large', array( 'class' => 'svc-thumb-img', 'loading' => 'lazy' ) ); ?>
+		<?php endif; ?>
+		<?php if ( $duration ) : ?>
+			<span class="svc-thumb-duration"><?php echo esc_html( $duration ); ?></span>
+		<?php endif; ?>
+		<div class="svc-thumb-title"><?php echo esc_html( get_the_title( $tile_post ) ); ?></div>
+	</a>
+	<?php
+}
+
+/**
  * Render the recirculation module: a grid of other recent videos with
  * thumbnail tiles, shown at the bottom of single video pages. The count
  * is filterable via 'svc_related_count'; 0 disables the module.
@@ -169,12 +217,7 @@ function svc_render_related( $post_id, $count = 4 ) {
 		<h2 class="svc-related-title"><?php echo esc_html( $heading ); ?></h2>
 		<div class="svc-gallery">
 			<?php foreach ( $related as $related_post ) : ?>
-				<a href="<?php echo esc_url( get_permalink( $related_post ) ); ?>" class="svc-thumbnail">
-					<?php if ( has_post_thumbnail( $related_post ) ) : ?>
-						<?php echo get_the_post_thumbnail( $related_post, 'medium_large', array( 'class' => 'svc-thumb-img', 'loading' => 'lazy' ) ); ?>
-					<?php endif; ?>
-					<div class="svc-thumb-title"><?php echo esc_html( get_the_title( $related_post ) ); ?></div>
-				</a>
+				<?php svc_render_tile( $related_post ); ?>
 			<?php endforeach; ?>
 		</div>
 		<p class="svc-related-all">
