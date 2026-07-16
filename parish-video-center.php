@@ -2,19 +2,20 @@
 /**
  * Plugin Name: Parish Video Center
  * Description: Syncs a Vimeo showcase into WordPress video posts with a gallery archive, single video pages, and VideoObject structured data. Post labels and URL slug are configurable (Homilies, Sermons, Messages, …).
- * Version: 1.3.2
+ * Version: 1.4.0
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Author: St. Paul the Apostle Catholic Church
  * License: GPL-2.0-or-later
  * Text Domain: parish-video-center
+ * Update URI: https://github.com/wakcyscanner/parish-video-center
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'SVC_VERSION', '1.3.2' );
+define( 'SVC_VERSION', '1.4.0' );
 define( 'SVC_PLUGIN_FILE', __FILE__ );
 define( 'SVC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SVC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -26,6 +27,9 @@ require_once SVC_PLUGIN_DIR . 'includes/class-settings.php';
 require_once SVC_PLUGIN_DIR . 'includes/class-structured-data.php';
 require_once SVC_PLUGIN_DIR . 'includes/class-redirects.php';
 require_once SVC_PLUGIN_DIR . 'includes/class-cache.php';
+require_once SVC_PLUGIN_DIR . 'includes/class-updates.php';
+require_once SVC_PLUGIN_DIR . 'includes/class-social-meta.php';
+require_once SVC_PLUGIN_DIR . 'includes/class-sitemap.php';
 
 SVC_Post_Type::init();
 SVC_Sync::init();
@@ -33,6 +37,9 @@ SVC_Settings::init();
 SVC_Structured_Data::init();
 SVC_Redirects::init();
 SVC_Cache::init();
+SVC_Updates::init();
+SVC_Social_Meta::init();
+SVC_Sitemap::init();
 
 /**
  * Get plugin settings merged with defaults.

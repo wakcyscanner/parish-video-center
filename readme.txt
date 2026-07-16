@@ -4,7 +4,7 @@ Tags: vimeo, video, sermons, homilies, church
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.3.2
+Stable tag: 1.4.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -23,6 +23,8 @@ Parish Video Center keeps a WordPress site in sync with a Vimeo showcase — per
 * Per-video "Don't overwrite with Vimeo data" lock so editors can customize a title, description, or thumbnail without sync reverting it.
 * Thumbnails are sideloaded into the media library and refreshed when they change on Vimeo.
 * VideoObject JSON-LD on single pages and ItemList JSON-LD on the archive.
+* Google video sitemap at /video-sitemap.xml (advertised in robots.txt) and Open Graph / Twitter player tags so shared links unfurl as playable video cards.
+* Updates itself from GitHub releases through the normal WordPress updates screen.
 * Deep links: /your-slug/?v=<vimeo-id> redirects (301) to the matching video page.
 
 == Installation ==
@@ -55,6 +57,11 @@ The plugin purges the major page caches (WP Rocket, W3 Total Cache, WP Super Cac
 Plugin options and scheduled events are removed. Video posts and sideloaded media are left in place.
 
 == Changelog ==
+
+= 1.4.0 =
+* Plugin updates now arrive through the normal WordPress updates screen, powered by GitHub releases (Update URI mechanism, no external service).
+* Open Graph and Twitter player tags on single video pages so shared links unfurl as playable video cards; steps aside for Yoast/Rank Math/SEOPress/AIOSEO basics and only adds the video tags they lack. Filterable via svc_social_meta.
+* Google video sitemap at /video-sitemap.xml with thumbnails, durations, and publication dates, advertised in robots.txt — submit it in Search Console for video rich results.
 
 = 1.3.2 =
 * WP Rocket-based caches (including AccelerateWP) now also get their minified assets and Used CSS (Remove Unused CSS) cleared, not just the page cache — stale optimized CSS was leaving new layouts unstyled for logged-out visitors. Autoptimize's asset cache is cleared too.

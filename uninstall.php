@@ -13,5 +13,6 @@ delete_option( 'svc_last_sync' );
 delete_option( 'svc_flush_rewrite' );
 delete_option( 'svc_version' );
 delete_transient( 'svc_test_result' );
+delete_transient( 'svc_update_check' );
 
 wp_clear_scheduled_hook( 'svc_sync_event' );

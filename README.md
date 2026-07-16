@@ -12,7 +12,8 @@ Videos become real WordPress posts (a custom post type), so they get permalinks,
 - **Recirculation** — every single video page ends with a thumbnail grid of other recent videos and a link to the full gallery (count filterable via `svc_related_count`; return `0` to disable).
 - **Click-to-play facade** — pages load only a poster image; the Vimeo iframe is injected on click (`dnt=1` set on the player), so no third-party requests until the visitor opts in.
 - **Safe sync semantics** — videos removed from the showcase are unpublished (drafted), never deleted, and re-publish if they return. A per-video *"Don't overwrite with Vimeo data"* lock protects manual edits.
-- **SEO** — VideoObject JSON-LD on single pages, ItemList JSON-LD on the archive. Thumbnails are sideloaded into the media library.
+- **SEO** — VideoObject JSON-LD on single pages, ItemList JSON-LD on the archive, a Google video sitemap at `/video-sitemap.xml` (advertised in robots.txt), and Open Graph / Twitter player tags so shared links unfurl as playable cards. Thumbnails are sideloaded into the media library.
+- **Self-updating** — new releases on GitHub appear on the normal WordPress updates screen (native `Update URI` mechanism, no external service).
 - **Deep links** — `/your-slug/?v=<vimeo-id>` 301s to the matching video page.
 - **Cache-aware** — automatically purges the major page caches (WP Rocket, W3TC, WP Super Cache, LiteSpeed, WP Engine, and more) after content-changing syncs, plugin updates, and settings changes; other setups can hook `svc_purge_page_cache`.
 
