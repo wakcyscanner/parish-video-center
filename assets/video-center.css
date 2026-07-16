@@ -1,0 +1,269 @@
+/**
+ * StPACC Video Center styles — ported from the original Cloudflare embed (embed.css).
+ */
+
+.svc-wrap {
+	max-width: 1200px;
+	margin: 0 auto;
+	padding: 0 1rem;
+}
+
+.svc-archive-header {
+	margin-bottom: 1.5rem;
+}
+
+/* Player facade */
+.svc-player {
+	position: relative;
+	width: 100%;
+	aspect-ratio: 16 / 9;
+	background-color: #000;
+	border-radius: 8px;
+	overflow: hidden;
+	margin-bottom: 1.5rem;
+	cursor: pointer;
+}
+
+.svc-poster {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+.svc-play {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	background: none;
+	border: none;
+	cursor: pointer;
+	padding: 0;
+	transition: transform 0.2s ease, opacity 0.2s ease;
+	opacity: 0.9;
+}
+
+.svc-play:hover,
+.svc-play:focus {
+	transform: translate(-50%, -50%) scale(1.1);
+	opacity: 1;
+	outline: none;
+}
+
+.svc-play:focus-visible {
+	outline: 3px solid #00adef;
+	outline-offset: 4px;
+	border-radius: 50%;
+}
+
+.svc-player iframe {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	border: 0;
+}
+
+/* Video info */
+.svc-info {
+	margin-bottom: 2rem;
+}
+
+.svc-title {
+	font-size: 1.75rem;
+	font-weight: 700;
+	margin: 0 0 0.25rem 0;
+	line-height: 1.3;
+}
+
+.svc-title a {
+	color: inherit;
+	text-decoration: none;
+}
+
+.svc-title a:hover {
+	text-decoration: underline;
+}
+
+.svc-meta {
+	font-size: 0.875rem;
+	color: #999;
+	margin-bottom: 0.75rem;
+}
+
+.svc-description {
+	font-size: 1rem;
+	line-height: 1.6;
+	color: #666;
+}
+
+.svc-description a {
+	color: #00adef;
+	text-decoration: underline;
+	word-break: break-word;
+}
+
+.svc-description a:hover {
+	color: #0090cc;
+}
+
+.svc-back {
+	margin-top: 1.5rem;
+}
+
+.svc-back a {
+	color: #00adef;
+	text-decoration: none;
+	font-weight: 600;
+}
+
+.svc-back a:hover {
+	text-decoration: underline;
+}
+
+/* Gallery grid */
+.svc-gallery {
+	display: grid;
+	grid-template-columns: repeat(2, 1fr);
+	gap: 1rem;
+	margin-bottom: 2rem;
+}
+
+@media (min-width: 640px) {
+	.svc-gallery {
+		grid-template-columns: repeat(3, 1fr);
+	}
+}
+
+@media (min-width: 1024px) {
+	.svc-gallery {
+		grid-template-columns: repeat(4, 1fr);
+	}
+}
+
+.svc-thumbnail {
+	display: block;
+	position: relative;
+	aspect-ratio: 16 / 9;
+	border-radius: 6px;
+	overflow: hidden;
+	background-color: #f0f0f0;
+	text-decoration: none;
+	color: inherit;
+	transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.svc-thumbnail:hover,
+.svc-thumbnail:focus {
+	transform: translateY(-2px);
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+	outline: none;
+}
+
+.svc-thumbnail:focus-visible {
+	outline: 3px solid #00adef;
+	outline-offset: 2px;
+}
+
+.svc-thumb-img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+.svc-thumb-title {
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	padding: 0.75rem 0.5rem;
+	background: linear-gradient(to top, rgba(0, 0, 0, 0.9), transparent);
+	color: white;
+	font-size: 0.875rem;
+	font-weight: 500;
+	line-height: 1.3;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+}
+
+/* Pagination (WP the_posts_pagination markup) */
+.svc-wrap .navigation.pagination {
+	display: flex;
+	justify-content: center;
+	margin: 2rem 0;
+}
+
+.svc-wrap .nav-links {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.svc-wrap .page-numbers {
+	display: inline-block;
+	padding: 0.5rem 0.875rem;
+	border-radius: 6px;
+	background-color: #f0f0f0;
+	color: #333;
+	text-decoration: none;
+	font-size: 0.9375rem;
+	font-weight: 600;
+}
+
+.svc-wrap a.page-numbers:hover {
+	background-color: #00adef;
+	color: #fff;
+}
+
+.svc-wrap .page-numbers.current {
+	background-color: #00adef;
+	color: #fff;
+}
+
+/* Empty state */
+.svc-empty {
+	text-align: center;
+	padding: 3rem 1rem;
+	color: #999;
+	font-size: 1rem;
+}
+
+/* Responsive */
+@media (max-width: 639px) {
+	.svc-title {
+		font-size: 1.375rem;
+	}
+
+	.svc-info {
+		margin-bottom: 1.5rem;
+	}
+
+	.svc-gallery {
+		gap: 0.75rem;
+	}
+}
+
+/* Accessibility: reduced motion */
+@media (prefers-reduced-motion: reduce) {
+	.svc-play,
+	.svc-thumbnail {
+		transition: none;
+	}
+}
+
+/* Print */
+@media print {
+	.svc-play,
+	.svc-wrap .navigation.pagination {
+		display: none;
+	}
+
+	.svc-thumbnail {
+		break-inside: avoid;
+	}
+}
