@@ -1,7 +1,7 @@
 <?php
 /**
- * Legacy deep links: the old embed used /homilies/?v=<vimeo-id>.
- * 301 those to the matching homily permalink.
+ * Deep links: /<archive-slug>/?v=<vimeo-id> 301s to the matching video permalink.
+ * (Also covers legacy links from embeds that addressed videos by Vimeo ID.)
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -11,10 +11,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 class SVC_Redirects {
 
 	public static function init() {
-		add_action( 'template_redirect', array( __CLASS__, 'legacy_deep_link' ) );
+		add_action( 'template_redirect', array( __CLASS__, 'deep_link' ) );
 	}
 
-	public static function legacy_deep_link() {
+	public static function deep_link() {
 		if ( ! is_post_type_archive( SVC_Post_Type::POST_TYPE ) || empty( $_GET['v'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 			return;
 		}

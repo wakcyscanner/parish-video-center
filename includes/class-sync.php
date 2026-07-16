@@ -1,6 +1,6 @@
 <?php
 /**
- * Sync engine: pulls the Vimeo showcase into homily posts on a WP-Cron schedule.
+ * Sync engine: pulls the Vimeo showcase into video posts on a WP-Cron schedule.
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -9,7 +9,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class SVC_Sync {
 
-	const CRON_HOOK = 'svc_sync_event';
+	const CRON_HOOK   = 'svc_sync_event';
+	const FREQUENCIES = array( 'hourly', 'twicedaily', 'daily', 'weekly' );
 
 	public static function init() {
 		add_action( self::CRON_HOOK, array( __CLASS__, 'run' ) );
@@ -19,8 +20,8 @@ class SVC_Sync {
 
 	public static function schedule() {
 		if ( ! wp_next_scheduled( self::CRON_HOOK ) ) {
-			$settings = svc_get_settings();
-			$frequency = in_array( $settings['sync_frequency'], array( 'hourly', 'twicedaily', 'daily' ), true )
+			$settings  = svc_get_settings();
+			$frequency = in_array( $settings['sync_frequency'], self::FREQUENCIES, true )
 				? $settings['sync_frequency']
 				: 'hourly';
 			wp_schedule_event( time(), $frequency, self::CRON_HOOK );
@@ -38,14 +39,14 @@ class SVC_Sync {
 
 	public static function handle_manual_sync() {
 		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( esc_html__( 'Insufficient permissions.', 'stpacc-video-center' ) );
+			wp_die( esc_html__( 'Insufficient permissions.', 'parish-video-center' ) );
 		}
 		check_admin_referer( 'svc_sync_now' );
 
 		$result = self::run();
 		$flag   = is_wp_error( $result ) ? 'error' : 'ok';
 
-		wp_safe_redirect( add_query_arg( 'svc-synced', $flag, admin_url( 'options-general.php?page=svc-settings' ) ) );
+		wp_safe_redirect( add_query_arg( 'svc-synced', $flag, SVC_Settings::url() ) );
 		exit;
 	}
 
@@ -186,7 +187,7 @@ class SVC_Sync {
 				'status'  => 'ok',
 				'message' => sprintf(
 					/* translators: 1: total videos, 2: created, 3: updated, 4: unpublished, 5: locked */
-					__( '%1$d videos in showcase: %2$d created, %3$d updated, %4$d unpublished, %5$d locked.', 'stpacc-video-center' ),
+					__( '%1$d videos in showcase: %2$d created, %3$d updated, %4$d unpublished, %5$d locked.', 'parish-video-center' ),
 					count( $videos ),
 					$created,
 					$updated,

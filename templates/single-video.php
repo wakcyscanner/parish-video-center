@@ -1,6 +1,6 @@
 <?php
 /**
- * Single homily: player with title, date, and description below.
+ * Single video: player with title, date, and description below.
  *
  * Mirrors the wrapper structure of the Celine theme's single.php (page-header
  * banner, .content-area > main.site-main.entry-content.limit-width) so the
@@ -15,6 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 svc_get_header();
 
 $svc_theme_banner = svc_theme_page_header();
+$svc_settings     = svc_get_settings();
 
 while ( have_posts() ) :
 	the_post();
@@ -30,7 +31,10 @@ while ( have_posts() ) :
 					<div class="svc-meta"><?php echo esc_html( get_the_date() ); ?></div>
 					<div class="svc-description"><?php echo svc_render_description( get_post() ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in svc_render_description(). ?></div>
 					<p class="svc-back">
-						<a href="<?php echo esc_url( get_post_type_archive_link( SVC_Post_Type::POST_TYPE ) ); ?>">&larr; <?php esc_html_e( 'All homilies', 'stpacc-video-center' ); ?></a>
+						<a href="<?php echo esc_url( get_post_type_archive_link( SVC_Post_Type::POST_TYPE ) ); ?>">&larr; <?php
+							/* translators: %s: plural video label */
+							echo esc_html( sprintf( __( 'All %s', 'parish-video-center' ), $svc_settings['plural'] ) );
+						?></a>
 					</p>
 				</div>
 			</article>

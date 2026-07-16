@@ -1,7 +1,7 @@
 <?php
 /**
- * Uninstall cleanup: remove plugin options and scheduled events.
- * Homily posts and sideloaded media are intentionally left in place.
+ * Uninstall cleanup: remove plugin options, transients, and scheduled events.
+ * Video posts and sideloaded media are intentionally left in place.
  */
 
 if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
@@ -10,5 +10,7 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 
 delete_option( 'svc_settings' );
 delete_option( 'svc_last_sync' );
+delete_option( 'svc_flush_rewrite' );
+delete_transient( 'svc_test_result' );
 
 wp_clear_scheduled_hook( 'svc_sync_event' );

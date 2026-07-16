@@ -1,20 +1,20 @@
 <?php
 /**
- * Plugin Name: StPACC Video Center
- * Description: Syncs a Vimeo showcase into WordPress as homily posts with a gallery archive, single video pages, and VideoObject structured data.
- * Version: 1.0.0
+ * Plugin Name: Parish Video Center
+ * Description: Syncs a Vimeo showcase into WordPress video posts with a gallery archive, single video pages, and VideoObject structured data. Post labels and URL slug are configurable (Homilies, Sermons, Messages, …).
+ * Version: 1.1.0
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Author: St. Paul the Apostle Catholic Church
  * License: GPL-2.0-or-later
- * Text Domain: stpacc-video-center
+ * Text Domain: parish-video-center
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'SVC_VERSION', '1.0.0' );
+define( 'SVC_VERSION', '1.1.0' );
 define( 'SVC_PLUGIN_FILE', __FILE__ );
 define( 'SVC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SVC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -34,11 +34,17 @@ SVC_Redirects::init();
 
 /**
  * Get plugin settings merged with defaults.
+ *
+ * Label/slug defaults are deliberately untranslated plain strings: this runs
+ * before init on activation, where loading translations is too early.
  */
 function svc_get_settings() {
 	$defaults = array(
 		'vimeo_token'    => '',
-		'showcase_id'    => '10121743',
+		'showcase_id'    => '',
+		'singular'       => 'Video',
+		'plural'         => 'Videos',
+		'slug'           => 'videos',
 		'publisher'      => get_bloginfo( 'name' ),
 		'per_page'       => 12,
 		'sync_frequency' => 'hourly',
@@ -106,7 +112,7 @@ function svc_render_player( $post_id ) {
 		<?php if ( $poster ) : ?>
 			<img class="svc-poster" src="<?php echo esc_url( $poster ); ?>" alt="<?php echo esc_attr( $title ); ?>">
 		<?php endif; ?>
-		<button type="button" class="svc-play" aria-label="<?php echo esc_attr( sprintf( __( 'Play %s', 'stpacc-video-center' ), $title ) ); ?>">
+		<button type="button" class="svc-play" aria-label="<?php echo esc_attr( sprintf( __( 'Play %s', 'parish-video-center' ), $title ) ); ?>">
 			<svg width="68" height="68" viewBox="0 0 68 68" fill="none" aria-hidden="true" focusable="false">
 				<circle cx="34" cy="34" r="34" fill="rgba(0,0,0,0.7)"/>
 				<path d="M45 34L28 44V24L45 34Z" fill="white"/>
@@ -195,16 +201,25 @@ register_deactivation_hook( __FILE__, function () {
 	flush_rewrite_rules();
 } );
 
-// Serve plugin templates for the homily post type unless the theme provides its own.
+// Settings shortcut on the Plugins screen.
+add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), function ( $links ) {
+	array_unshift(
+		$links,
+		'<a href="' . esc_url( SVC_Settings::url() ) . '">' . esc_html__( 'Settings', 'parish-video-center' ) . '</a>'
+	);
+	return $links;
+} );
+
+// Serve plugin templates for the video post type unless the theme provides its own.
 add_filter( 'template_include', function ( $template ) {
 	if ( is_singular( SVC_Post_Type::POST_TYPE ) ) {
-		$theme_template = locate_template( 'single-homily.php' );
-		return $theme_template ? $theme_template : SVC_PLUGIN_DIR . 'templates/single-homily.php';
+		$theme_template = locate_template( 'single-' . SVC_Post_Type::POST_TYPE . '.php' );
+		return $theme_template ? $theme_template : SVC_PLUGIN_DIR . 'templates/single-video.php';
 	}
 
 	if ( is_post_type_archive( SVC_Post_Type::POST_TYPE ) ) {
-		$theme_template = locate_template( 'archive-homily.php' );
-		return $theme_template ? $theme_template : SVC_PLUGIN_DIR . 'templates/archive-homily.php';
+		$theme_template = locate_template( 'archive-' . SVC_Post_Type::POST_TYPE . '.php' );
+		return $theme_template ? $theme_template : SVC_PLUGIN_DIR . 'templates/archive-video.php';
 	}
 
 	return $template;

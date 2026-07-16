@@ -52,14 +52,14 @@ $svc_theme_banner = svc_theme_page_header();
 				<?php
 				the_posts_pagination(
 					array(
-						'prev_text' => __( '&larr; Previous', 'stpacc-video-center' ),
-						'next_text' => __( 'Next &rarr;', 'stpacc-video-center' ),
+						'prev_text' => __( '&larr; Previous', 'parish-video-center' ),
+						'next_text' => __( 'Next &rarr;', 'parish-video-center' ),
 					)
 				);
 				?>
 
 			<?php else : ?>
-				<p class="svc-empty"><?php esc_html_e( 'No videos available.', 'stpacc-video-center' ); ?></p>
+				<p class="svc-empty"><?php esc_html_e( 'No videos available.', 'parish-video-center' ); ?></p>
 			<?php endif; ?>
 
 		</div>

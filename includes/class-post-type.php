@@ -1,6 +1,7 @@
 <?php
 /**
- * Registers the homily custom post type.
+ * Registers the video custom post type with labels and URL slug from settings,
+ * so each site can call these what it likes (Homilies, Sermons, Messages, …).
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -9,10 +10,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class SVC_Post_Type {
 
-	const POST_TYPE = 'homily';
+	const POST_TYPE = 'svc_video';
 
 	public static function init() {
 		add_action( 'init', array( __CLASS__, 'register' ) );
+		add_action( 'init', array( __CLASS__, 'maybe_flush_rewrites' ), 20 );
 		add_action( 'add_meta_boxes_' . self::POST_TYPE, array( __CLASS__, 'add_lock_meta_box' ) );
 		add_action( 'save_post_' . self::POST_TYPE, array( __CLASS__, 'save_lock_meta' ), 10, 2 );
 	}
@@ -20,7 +22,7 @@ class SVC_Post_Type {
 	public static function add_lock_meta_box() {
 		add_meta_box(
 			'svc-sync-lock',
-			__( 'Vimeo Sync', 'stpacc-video-center' ),
+			__( 'Vimeo Sync', 'parish-video-center' ),
 			array( __CLASS__, 'render_lock_meta_box' ),
 			self::POST_TYPE,
 			'side'
@@ -33,9 +35,9 @@ class SVC_Post_Type {
 		?>
 		<label for="svc-sync-lock-field">
 			<input type="checkbox" id="svc-sync-lock-field" name="svc_sync_lock" value="1" <?php checked( $locked ); ?>>
-			<?php esc_html_e( "Don't overwrite with Vimeo data", 'stpacc-video-center' ); ?>
+			<?php esc_html_e( "Don't overwrite with Vimeo data", 'parish-video-center' ); ?>
 		</label>
-		<p class="description"><?php esc_html_e( 'When checked, sync leaves this homily alone entirely: the title, description, status, and featured image you set here are preserved, and it will not be unpublished if the video leaves the showcase.', 'stpacc-video-center' ); ?></p>
+		<p class="description"><?php esc_html_e( 'When checked, sync leaves this post alone entirely: the title, description, status, and featured image you set here are preserved, and it will not be unpublished if the video leaves the showcase.', 'parish-video-center' ); ?></p>
 		<?php
 	}
 
@@ -59,25 +61,40 @@ class SVC_Post_Type {
 	}
 
 	public static function register() {
+		$settings = svc_get_settings();
+
+		$singular = '' !== trim( $settings['singular'] ) ? $settings['singular'] : 'Video';
+		$plural   = '' !== trim( $settings['plural'] ) ? $settings['plural'] : 'Videos';
+		$slug     = sanitize_title( $settings['slug'] );
+		if ( '' === $slug ) {
+			$slug = 'videos';
+		}
+
 		register_post_type(
 			self::POST_TYPE,
 			array(
 				'labels'       => array(
-					'name'               => __( 'Homilies', 'stpacc-video-center' ),
-					'singular_name'      => __( 'Homily', 'stpacc-video-center' ),
-					'menu_name'          => __( 'Homilies', 'stpacc-video-center' ),
-					'add_new_item'       => __( 'Add New Homily', 'stpacc-video-center' ),
-					'edit_item'          => __( 'Edit Homily', 'stpacc-video-center' ),
-					'view_item'          => __( 'View Homily', 'stpacc-video-center' ),
-					'search_items'       => __( 'Search Homilies', 'stpacc-video-center' ),
-					'not_found'          => __( 'No homilies found.', 'stpacc-video-center' ),
-					'all_items'          => __( 'All Homilies', 'stpacc-video-center' ),
+					'name'          => $plural,
+					'singular_name' => $singular,
+					'menu_name'     => $plural,
+					/* translators: %s: singular video label */
+					'add_new_item'  => sprintf( __( 'Add New %s', 'parish-video-center' ), $singular ),
+					/* translators: %s: singular video label */
+					'edit_item'     => sprintf( __( 'Edit %s', 'parish-video-center' ), $singular ),
+					/* translators: %s: singular video label */
+					'view_item'     => sprintf( __( 'View %s', 'parish-video-center' ), $singular ),
+					/* translators: %s: plural video label */
+					'search_items'  => sprintf( __( 'Search %s', 'parish-video-center' ), $plural ),
+					/* translators: %s: plural video label */
+					'not_found'     => sprintf( __( 'No %s found.', 'parish-video-center' ), $plural ),
+					/* translators: %s: plural video label */
+					'all_items'     => sprintf( __( 'All %s', 'parish-video-center' ), $plural ),
 				),
-				'description'  => __( 'Videos synced from the parish Vimeo showcase.', 'stpacc-video-center' ),
+				'description'  => __( 'Videos synced from a Vimeo showcase.', 'parish-video-center' ),
 				'public'       => true,
-				'has_archive'  => 'homilies',
+				'has_archive'  => $slug,
 				'rewrite'      => array(
-					'slug'       => 'homilies',
+					'slug'       => $slug,
 					'with_front' => false,
 				),
 				'menu_icon'    => 'dashicons-video-alt3',
@@ -85,5 +102,16 @@ class SVC_Post_Type {
 				'show_in_rest' => true,
 			)
 		);
+	}
+
+	/**
+	 * Flush rewrite rules once after the archive slug setting changes.
+	 * Runs at init 20, after register() has re-registered with the new slug.
+	 */
+	public static function maybe_flush_rewrites() {
+		if ( get_option( 'svc_flush_rewrite' ) ) {
+			flush_rewrite_rules();
+			delete_option( 'svc_flush_rewrite' );
+		}
 	}
 }

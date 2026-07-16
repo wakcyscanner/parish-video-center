@@ -1,6 +1,6 @@
 <?php
 /**
- * Server-rendered JSON-LD: VideoObject on single homilies, ItemList on the archive.
+ * Server-rendered JSON-LD: VideoObject on single videos, ItemList on the archive.
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
