@@ -4,7 +4,7 @@ Tags: vimeo, video, sermons, homilies, church
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.4.0
+Stable tag: 1.5.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -18,6 +18,7 @@ Parish Video Center keeps a WordPress site in sync with a Vimeo showcase — per
 * Configurable naming: call your videos Homilies, Sermons, Messages — labels and the archive URL slug are settings.
 * Video-hub landing page: split hero with the latest video's player beside a "Latest" badge, excerpt, and an Up Next list, then a "Browse all" thumbnail grid with duration badges and pagination.
 * "More videos" recirculation grid at the bottom of every single video page, with thumbnail previews of other recent videos.
+* Put recent videos on any page: the "Parish Videos" block (with live preview) or the [parish_videos] shortcode, as a thumbnail grid or a swipeable slider.
 * Click-to-play player facade: pages load a poster image, and the Vimeo iframe is only injected on click (fast pages, no third-party requests until the visitor opts in; dnt=1 is set on the player).
 * Videos removed from the showcase are unpublished (drafted), never deleted. Videos that return are re-published.
 * Per-video "Don't overwrite with Vimeo data" lock so editors can customize a title, description, or thumbnail without sync reverting it.
@@ -48,6 +49,10 @@ No. When a video leaves the showcase, its post is set back to draft. Nothing is 
 
 Yes — check "Don't overwrite with Vimeo data" in the Vimeo Sync box on the edit screen, or sync will overwrite your changes on its next run.
 
+= How do I show recent videos on my homepage? =
+
+Add the "Parish Videos" block in the editor (choose grid or slider, set the count and an optional heading), or put the shortcode `[parish_videos count="6" layout="slider" title="Recent Homilies"]` anywhere shortcodes work.
+
 = Visitors see an outdated page even though the videos updated =
 
 The plugin purges the major page caches (WP Rocket, W3 Total Cache, WP Super Cache, WP Fastest Cache, LiteSpeed, SiteGround Optimizer, Cache Enabler, Breeze, Hummingbird, Nginx Helper, Comet Cache, WP Engine, Pantheon) automatically after every sync that changes content, after a plugin update, and after saving settings. If your cache isn't on that list, hook the `svc_purge_page_cache` action and clear it there.
@@ -57,6 +62,9 @@ The plugin purges the major page caches (WP Rocket, W3 Total Cache, WP Super Cac
 Plugin options and scheduled events are removed. Video posts and sideloaded media are left in place.
 
 == Changelog ==
+
+= 1.5.0 =
+* New "Parish Videos" block and [parish_videos] shortcode to embed recent videos on any page, as a thumbnail grid or a swipeable slider (scroll-snap with arrow buttons; no JS library). Attributes: count (1-24), layout (grid/slider), title.
 
 = 1.4.0 =
 * Plugin updates now arrive through the normal WordPress updates screen, powered by GitHub releases (Update URI mechanism, no external service).

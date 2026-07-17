@@ -364,6 +364,71 @@
 	text-decoration: underline;
 }
 
+/* Embedded collections (shortcode / block) */
+.svc-collection {
+	margin: 1.5rem 0;
+}
+
+/* Slider layout: scroll-snap row; arrows are added by slider.js */
+.svc-slider {
+	position: relative;
+}
+
+.svc-slider-track {
+	display: flex;
+	gap: 1rem;
+	overflow-x: auto;
+	scroll-snap-type: x mandatory;
+	-webkit-overflow-scrolling: touch;
+	scrollbar-width: none;
+	padding-bottom: 0.25rem;
+}
+
+.svc-slider-track::-webkit-scrollbar {
+	display: none;
+}
+
+.svc-slider-track .svc-thumbnail {
+	flex: 0 0 min(70vw, 300px);
+	scroll-snap-align: start;
+}
+
+.svc-slider-arrow {
+	position: absolute;
+	top: 50%;
+	transform: translateY(-50%);
+	z-index: 1;
+	width: 2.5rem;
+	height: 2.5rem;
+	border: none;
+	border-radius: 50%;
+	background: rgba(0, 0, 0, 0.65);
+	color: #fff;
+	font-size: 1.5rem;
+	line-height: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+}
+
+.svc-slider-arrow:hover {
+	background: rgba(0, 0, 0, 0.85);
+}
+
+.svc-slider-arrow:focus-visible {
+	outline: 3px solid #00adef;
+	outline-offset: 2px;
+}
+
+.svc-slider-prev {
+	left: 0.5rem;
+}
+
+.svc-slider-next {
+	right: 0.5rem;
+}
+
 /* Pagination (WP the_posts_pagination markup) */
 .svc-wrap .navigation.pagination {
 	display: flex;

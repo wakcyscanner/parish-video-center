@@ -1,0 +1,24 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "parish-video-center/videos",
+	"title": "Parish Videos",
+	"category": "media",
+	"icon": "video-alt3",
+	"description": "Recent videos as a thumbnail grid or slider.",
+	"keywords": [ "video", "homily", "sermon", "vimeo", "gallery", "slider" ],
+	"textdomain": "parish-video-center",
+	"attributes": {
+		"count": { "type": "number", "default": 6 },
+		"layout": { "type": "string", "default": "grid" },
+		"title": { "type": "string", "default": "" }
+	},
+	"supports": {
+		"html": false,
+		"align": [ "wide", "full" ]
+	},
+	"editorScript": "svc-videos-editor",
+	"editorStyle": "svc-video-center",
+	"style": "svc-video-center",
+	"viewScript": "svc-slider"
+}
