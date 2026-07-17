@@ -1,0 +1,78 @@
+# Pushing a tag matching 'v*' builds the installable zip and publishes the
+# GitHub release. Tags like v1.8.0-beta.1 become pre-releases (beta channel);
+# plain v1.8.0 tags become the stable "latest" release that production sites
+# update to. Sites discover releases via the plugin's Update URI checker.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Derive version and channel from tag
+        id: meta
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          case "$VERSION" in
+            *-*) echo "prerelease=true"  >> "$GITHUB_OUTPUT" ;;
+            *)   echo "prerelease=false" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - name: Verify plugin version matches tag
+        run: |
+          VERSION="${{ steps.meta.outputs.version }}"
+          HEADER=$(grep -oP '^\s*\*\s*Version:\s*\K[0-9A-Za-z.\-]+' parish-video-center.php)
+          CONSTANT=$(grep -oP "define\( 'SVC_VERSION', '\K[^']+" parish-video-center.php)
+          echo "tag=$VERSION header=$HEADER constant=$CONSTANT"
+          if [ "$HEADER" != "$VERSION" ] || [ "$CONSTANT" != "$VERSION" ]; then
+            echo "::error::Plugin version does not match tag — bump the header and SVC_VERSION before tagging."
+            exit 1
+          fi
+
+      - name: Build installable zip
+        run: git archive --format=zip --prefix=parish-video-center/ "$GITHUB_REF_NAME" -o parish-video-center.zip
+
+      - name: Extract release notes from readme.txt
+        id: notes
+        run: |
+          VERSION="${{ steps.meta.outputs.version }}"
+          awk -v ver="$VERSION" '
+            $0 == "= " ver " =" { flag = 1; next }
+            flag && /^= /       { exit }
+            flag                { print }
+          ' readme.txt > notes.md
+          if [ ! -s notes.md ]; then
+            if [ "${{ steps.meta.outputs.prerelease }}" = "true" ]; then
+              echo "Beta build for staging — not production-ready. See the commit log for changes." > notes.md
+            else
+              echo "See readme.txt for details." > notes.md
+            fi
+          fi
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          EXTRA=""
+          if [ "${{ steps.meta.outputs.prerelease }}" = "true" ]; then
+            EXTRA="--prerelease"
+            TITLE="$GITHUB_REF_NAME — Parish Video Center (beta)"
+          else
+            EXTRA="--latest"
+            TITLE="$GITHUB_REF_NAME — Parish Video Center"
+          fi
+          gh release create "$GITHUB_REF_NAME" parish-video-center.zip \
+            --title "$TITLE" \
+            --notes-file notes.md \
+            $EXTRA

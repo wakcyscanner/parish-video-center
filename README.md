@@ -31,6 +31,22 @@ Your gallery appears at `yoursite.org/<your-slug>/`.
 
 > **Tip:** instead of storing the token in the database, define it in `wp-config.php` — `define( 'VIMEO_TOKEN', '…' );` — which overrides the settings field.
 
+## Releases, branches, and channels
+
+- **`main`** is stable — what production parishes run. Stable releases are tags `vX.Y.Z` on `main`.
+- **`beta`** is the staging branch — changes land here first and ship as pre-releases tagged `vX.Y.Z-beta.N`.
+
+Pushing any `v*` tag triggers the release workflow (`.github/workflows/release.yml`): it verifies the plugin's version header and `SVC_VERSION` match the tag, builds `parish-video-center.zip` with `git archive`, uses that version's `readme.txt` changelog section as the release notes, and publishes — as a **pre-release** for `-beta` tags (invisible to production) or as the **latest stable** release otherwise.
+
+Update delivery is channel-based: sites default to stable and only ever see stable releases. A staging site opts into betas with `define( 'SVC_UPDATE_CHANNEL', 'beta' );` in wp-config.php and is then offered whichever release — beta or stable — is newest (beta checks cache for 15 minutes; `wp transient delete svc_update_check_beta` forces a re-check).
+
+Shipping a change:
+
+1. Commit to `beta`, setting the plugin version to e.g. `1.8.0-beta.1` (header and `SVC_VERSION`).
+2. `git tag v1.8.0-beta.1 && git push origin beta v1.8.0-beta.1` — staging offers the update shortly after.
+3. Verify on staging; iterate with `-beta.2` etc. as needed.
+4. Promote: merge `beta` into `main`, set the version to `1.8.0`, add the `readme.txt` changelog entry, tag `v1.8.0`, push. Production sees it on the next update check.
+
 ## Requirements
 
 - WordPress 6.0+

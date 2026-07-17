@@ -4,7 +4,7 @@ Tags: vimeo, video, sermons, homilies, church
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.6.0
+Stable tag: 1.7.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -62,11 +62,19 @@ Use the standalone embed: `/video-embed/?layout=slider&count=8` serves just the 
 
 The plugin purges the major page caches (WP Rocket, W3 Total Cache, WP Super Cache, WP Fastest Cache, LiteSpeed, SiteGround Optimizer, Cache Enabler, Breeze, Hummingbird, Nginx Helper, Comet Cache, WP Engine, Pantheon) automatically after every sync that changes content, after a plugin update, and after saving settings. If your cache isn't on that list, hook the `svc_purge_page_cache` action and clear it there.
 
+= How do I test pre-release versions on a staging site? =
+
+Add `define( 'SVC_UPDATE_CHANNEL', 'beta' );` to the staging site's wp-config.php (or return 'beta' from the `svc_update_channel` filter). That site will then be offered beta releases as well as stable ones — whichever is newest. Production sites without this line only ever see stable releases. The settings page shows a notice when a site is on the beta channel.
+
 = What happens on uninstall? =
 
 Plugin options and scheduled events are removed. Video posts and sideloaded media are left in place.
 
 == Changelog ==
+
+= 1.7.0 =
+* Release channels: staging sites can opt into pre-release (beta) versions with define( 'SVC_UPDATE_CHANNEL', 'beta' ) in wp-config.php; production sites only ever see stable releases. The settings page indicates when a site is on the beta channel.
+* Releases are now built and published automatically when a version tag is pushed, with a safety check that the tagged code's version matches the tag.
 
 = 1.6.0 =
 * Standalone embed endpoint at /video-embed/ (params: layout, count, title): the video collection with its own styles and scripts and no theme chrome, for iframing or edge-worker inlining into pages the plugin can't reach. Links open in the top window; the page reports its height to the parent frame via postMessage; noindex.

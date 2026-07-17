@@ -305,6 +305,12 @@ class SVC_Settings {
 					<?php echo esc_html( date_i18n( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $next + (int) get_option( 'gmt_offset' ) * HOUR_IN_SECONDS ) ); ?>
 				</p>
 			<?php endif; ?>
+			<?php if ( 'beta' === SVC_Updates::channel() ) : ?>
+				<p>
+					<strong><?php esc_html_e( 'Update channel:', 'parish-video-center' ); ?></strong>
+					<?php esc_html_e( 'Beta — this site receives pre-release versions (set via SVC_UPDATE_CHANNEL or the svc_update_channel filter).', 'parish-video-center' ); ?>
+				</p>
+			<?php endif; ?>
 
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="display:inline-block;margin-right:0.5em;">
 				<input type="hidden" name="action" value="svc_test_connection">
