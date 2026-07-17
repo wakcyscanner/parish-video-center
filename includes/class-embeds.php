@@ -12,12 +12,24 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class SVC_Embeds {
 
+	const EMBED_QUERY_VAR = 'svc_video_embed';
+
 	public static function init() {
 		add_shortcode( 'parish_videos', array( __CLASS__, 'shortcode' ) );
 		add_action( 'init', array( __CLASS__, 'register_assets_and_block' ) );
+		add_filter( 'query_vars', array( __CLASS__, 'query_vars' ) );
+		// Priority 0: render and exit before redirect_canonical can 301 the URL.
+		add_action( 'template_redirect', array( __CLASS__, 'maybe_render_embed' ), 0 );
+	}
+
+	public static function query_vars( $vars ) {
+		$vars[] = self::EMBED_QUERY_VAR;
+		return $vars;
 	}
 
 	public static function register_assets_and_block() {
+		add_rewrite_rule( '^video-embed/?$', 'index.php?' . self::EMBED_QUERY_VAR . '=1', 'top' );
+
 		if ( ! wp_style_is( 'svc-video-center', 'registered' ) ) {
 			wp_register_style( 'svc-video-center', SVC_PLUGIN_URL . 'assets/video-center.css', array(), SVC_VERSION );
 		}
@@ -61,6 +73,61 @@ class SVC_Embeds {
 				)
 			)
 		);
+	}
+
+	/**
+	 * Standalone embed page at /video-embed/ — the collection with its own
+	 * assets and no theme chrome, made to be iframed (or fetched and inlined)
+	 * into pages the plugin can't reach: locked homepage templates, edge
+	 * workers, other sites. Params: ?layout=grid|slider&count=N&title=...
+	 */
+	public static function maybe_render_embed() {
+		if ( ! get_query_var( self::EMBED_QUERY_VAR ) ) {
+			return;
+		}
+
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- public read-only endpoint.
+		$args = array(
+			'count'  => isset( $_GET['count'] ) ? (int) $_GET['count'] : 8,
+			'layout' => isset( $_GET['layout'] ) ? sanitize_key( wp_unslash( $_GET['layout'] ) ) : 'slider',
+			'title'  => isset( $_GET['title'] ) ? sanitize_text_field( wp_unslash( $_GET['title'] ) ) : '',
+		);
+		// phpcs:enable
+
+		$html = self::render( $args );
+
+		header( 'Content-Type: text/html; charset=' . get_option( 'blog_charset' ) );
+		// The embed is a fragment of other pages; keep it out of search results.
+		header( 'X-Robots-Tag: noindex' );
+		?>
+<!doctype html>
+<html <?php language_attributes(); ?>>
+<head>
+	<meta charset="<?php bloginfo( 'charset' ); ?>">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<base target="_top">
+	<link rel="stylesheet" href="<?php echo esc_url( SVC_PLUGIN_URL . 'assets/video-center.css?ver=' . SVC_VERSION ); ?>">
+	<style>body { margin: 0; background: transparent; } .svc-collection { margin: 0; }</style>
+</head>
+<body class="svc-embed">
+<?php echo $html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built from escaped parts in render(). ?>
+<script src="<?php echo esc_url( SVC_PLUGIN_URL . 'assets/slider.js?ver=' . SVC_VERSION ); ?>"></script>
+<script>
+(function () {
+	function send() {
+		window.parent.postMessage(
+			{ type: 'svc-embed-height', height: document.documentElement.scrollHeight },
+			'*'
+		);
+	}
+	window.addEventListener('load', send);
+	window.addEventListener('resize', send);
+})();
+</script>
+</body>
+</html>
+		<?php
+		exit;
 	}
 
 	/**
