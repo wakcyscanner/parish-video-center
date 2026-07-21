@@ -30,11 +30,18 @@ class SVC_Updates {
 
 	/**
 	 * Release channel: 'stable' (default) or 'beta'. A staging site opts into
-	 * betas with define( 'SVC_UPDATE_CHANNEL', 'beta' ) in wp-config.php, or
-	 * via the svc_update_channel filter.
+	 * betas with the "Receive beta (pre-release) updates" checkbox in
+	 * settings. An SVC_UPDATE_CHANNEL constant in wp-config.php overrides the
+	 * checkbox; the svc_update_channel filter overrides both.
 	 */
 	public static function channel() {
-		$channel = defined( 'SVC_UPDATE_CHANNEL' ) ? SVC_UPDATE_CHANNEL : 'stable';
+		$settings = svc_get_settings();
+		$channel  = 'beta' === $settings['update_channel'] ? 'beta' : 'stable';
+
+		if ( defined( 'SVC_UPDATE_CHANNEL' ) && SVC_UPDATE_CHANNEL ) {
+			$channel = SVC_UPDATE_CHANNEL;
+		}
+
 		$channel = apply_filters( 'svc_update_channel', $channel );
 
 		return 'beta' === $channel ? 'beta' : 'stable';

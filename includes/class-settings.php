@@ -96,6 +96,7 @@ class SVC_Settings {
 			'publisher'      => isset( $input['publisher'] ) ? sanitize_text_field( $input['publisher'] ) : $current['publisher'],
 			'per_page'       => isset( $input['per_page'] ) ? min( 48, max( 1, (int) $input['per_page'] ) ) : $current['per_page'],
 			'sync_frequency' => $frequency,
+			'update_channel' => ( isset( $input['update_channel'] ) && 'beta' === $input['update_channel'] ) ? 'beta' : 'stable',
 		);
 	}
 
@@ -284,6 +285,31 @@ class SVC_Settings {
 						</td>
 					</tr>
 				</table>
+
+				<h2><?php esc_html_e( 'Updates', 'parish-video-center' ); ?></h2>
+				<table class="form-table" role="presentation">
+					<tr>
+						<th scope="row"><?php esc_html_e( 'Update Channel', 'parish-video-center' ); ?></th>
+						<td>
+							<?php if ( defined( 'SVC_UPDATE_CHANNEL' ) && SVC_UPDATE_CHANNEL ) : ?>
+								<p><em>
+									<?php
+									printf(
+										/* translators: %s: the channel forced by the constant */
+										esc_html__( 'Forced to "%s" by SVC_UPDATE_CHANNEL in wp-config.php — the constant overrides this checkbox.', 'parish-video-center' ),
+										esc_html( SVC_Updates::channel() )
+									);
+									?>
+								</em></p>
+							<?php endif; ?>
+							<label>
+								<input type="checkbox" name="svc_settings[update_channel]" value="beta" <?php checked( 'beta', $settings['update_channel'] ); ?>>
+								<?php esc_html_e( 'Receive beta (pre-release) updates', 'parish-video-center' ); ?>
+							</label>
+							<p class="description"><?php esc_html_e( 'For staging sites: offers pre-release versions from the beta channel as plugin updates. Leave unchecked on production — it then only ever sees stable releases.', 'parish-video-center' ); ?></p>
+						</td>
+					</tr>
+				</table>
 				<?php submit_button(); ?>
 			</form>
 
@@ -303,12 +329,6 @@ class SVC_Settings {
 				<p>
 					<strong><?php esc_html_e( 'Next scheduled sync:', 'parish-video-center' ); ?></strong>
 					<?php echo esc_html( date_i18n( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $next + (int) get_option( 'gmt_offset' ) * HOUR_IN_SECONDS ) ); ?>
-				</p>
-			<?php endif; ?>
-			<?php if ( 'beta' === SVC_Updates::channel() ) : ?>
-				<p>
-					<strong><?php esc_html_e( 'Update channel:', 'parish-video-center' ); ?></strong>
-					<?php esc_html_e( 'Beta — this site receives pre-release versions (set via SVC_UPDATE_CHANNEL or the svc_update_channel filter).', 'parish-video-center' ); ?>
 				</p>
 			<?php endif; ?>
 
