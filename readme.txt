@@ -64,13 +64,16 @@ The plugin purges the major page caches (WP Rocket, W3 Total Cache, WP Super Cac
 
 = How do I test pre-release versions on a staging site? =
 
-Add `define( 'SVC_UPDATE_CHANNEL', 'beta' );` to the staging site's wp-config.php (or return 'beta' from the `svc_update_channel` filter). That site will then be offered beta releases as well as stable ones — whichever is newest. Production sites without this line only ever see stable releases. The settings page shows a notice when a site is on the beta channel.
+Tick "Receive beta (pre-release) updates" in the plugin settings. That site will then be offered beta releases as well as stable ones — whichever is newest. Production sites with it unchecked (the default) only ever see stable releases. For per-environment control, an `SVC_UPDATE_CHANNEL` constant in wp-config.php overrides the checkbox, and the `svc_update_channel` filter overrides both.
 
 = What happens on uninstall? =
 
 Plugin options and scheduled events are removed. Video posts and sideloaded media are left in place.
 
 == Changelog ==
+
+= 1.8.0 =
+* Beta updates are now a settings checkbox — "Receive beta (pre-release) updates" — matching the Parish Events plugin, instead of requiring a wp-config.php constant. The SVC_UPDATE_CHANNEL constant still overrides the checkbox where defined, and the svc_update_channel filter overrides both.
 
 = 1.7.0 =
 * Release channels: staging sites can opt into pre-release (beta) versions with define( 'SVC_UPDATE_CHANNEL', 'beta' ) in wp-config.php; production sites only ever see stable releases. The settings page indicates when a site is on the beta channel.

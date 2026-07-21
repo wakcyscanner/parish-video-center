@@ -38,7 +38,7 @@ Your gallery appears at `yoursite.org/<your-slug>/`.
 
 Pushing any `v*` tag triggers the release workflow (`.github/workflows/release.yml`): it verifies the plugin's version header and `SVC_VERSION` match the tag, builds `parish-video-center.zip` with `git archive`, uses that version's `readme.txt` changelog section as the release notes, and publishes — as a **pre-release** for `-beta` tags (invisible to production) or as the **latest stable** release otherwise.
 
-Update delivery is channel-based: sites default to stable and only ever see stable releases. A staging site opts into betas with `define( 'SVC_UPDATE_CHANNEL', 'beta' );` in wp-config.php and is then offered whichever release — beta or stable — is newest (beta checks cache for 15 minutes; `wp transient delete svc_update_check_beta` forces a re-check).
+Update delivery is channel-based: sites default to stable and only ever see stable releases. A staging site opts into betas with the **"Receive beta (pre-release) updates"** checkbox in the plugin settings and is then offered whichever release — beta or stable — is newest (beta checks cache for 15 minutes; `wp transient delete svc_update_check_beta` forces a re-check). An `SVC_UPDATE_CHANNEL` constant in wp-config.php overrides the checkbox; the `svc_update_channel` filter overrides both.
 
 Shipping a change:
 
