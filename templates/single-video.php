@@ -23,7 +23,14 @@ while ( have_posts() ) :
 	<div class="content-area" id="primary">
 		<main class="site-main entry-content limit-width" id="main">
 			<article <?php post_class( 'svc-wrap svc-single' ); ?>>
-				<?php svc_render_player( get_the_ID() ); ?>
+				<?php
+				/**
+				 * Player mode on single video pages. 'embed' renders the real
+				 * Vimeo iframe so search engines classify these as watch
+				 * pages; return 'facade' to restore click-to-play.
+				 */
+				svc_render_player( get_the_ID(), apply_filters( 'svc_single_player_mode', 'embed' ) );
+				?>
 				<div class="svc-info">
 					<?php if ( ! $svc_theme_banner ) : ?>
 						<h1 class="svc-title"><?php the_title(); ?></h1>
