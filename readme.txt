@@ -72,6 +72,9 @@ Plugin options and scheduled events are removed. Video posts and sideloaded medi
 
 == Changelog ==
 
+= 1.9.0 =
+* Single video pages now embed the Vimeo player directly instead of the click-to-play facade, so Google's video indexing recognizes them as watch pages (a facade contains no player element for crawlers, which was causing "page is not a watch page" feedback in Search Console). Preconnect hints offset the performance cost; the facade remains on archive, embeds, and sliders. Return 'facade' from the svc_single_player_mode filter to restore the old behavior.
+
 = 1.8.0 =
 * Beta updates are now a settings checkbox — "Receive beta (pre-release) updates" — matching the Parish Events plugin, instead of requiring a wp-config.php constant. The SVC_UPDATE_CHANNEL constant still overrides the checkbox where defined, and the svc_update_channel filter overrides both.
 

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Parish Video Center
  * Description: Syncs a Vimeo showcase into WordPress video posts with a gallery archive, single video pages, and VideoObject structured data. Post labels and URL slug are configurable (Homilies, Sermons, Messages, …).
- * Version: 1.8.0
+ * Version: 1.9.0-beta.1
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Author: St. Paul the Apostle Catholic Church
@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'SVC_VERSION', '1.8.0' );
+define( 'SVC_VERSION', '1.9.0-beta.1' );
 define( 'SVC_PLUGIN_FILE', __FILE__ );
 define( 'SVC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SVC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -108,16 +108,36 @@ function svc_format_duration( $seconds ) {
 }
 
 /**
- * Render the click-to-play player facade: poster image + play button.
- * assets/player.js swaps it for the Vimeo iframe on click.
+ * Render the video player.
+ *
+ * 'facade' (default): poster image + play button; assets/player.js swaps in
+ * the Vimeo iframe on click. Fast, no third-party requests — used on list
+ * pages and embeds.
+ *
+ * 'embed': the real Vimeo iframe, rendered immediately. Used on single video
+ * pages so search engines see an actual player and classify them as watch
+ * pages — a facade renders as div+img+button, i.e. no video at all to a
+ * crawler that doesn't click.
  */
-function svc_render_player( $post_id ) {
+function svc_render_player( $post_id, $mode = 'facade' ) {
 	$vimeo_id = get_post_meta( $post_id, '_vimeo_id', true );
 	if ( ! $vimeo_id ) {
 		return;
 	}
 
-	$title  = get_the_title( $post_id );
+	$title = get_the_title( $post_id );
+
+	if ( 'embed' === $mode ) {
+		?>
+		<div class="svc-player svc-playing">
+			<iframe src="<?php echo esc_url( 'https://player.vimeo.com/video/' . rawurlencode( $vimeo_id ) . '?dnt=1' ); ?>"
+				title="<?php echo esc_attr( $title ); ?>"
+				allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>
+		</div>
+		<?php
+		return;
+	}
+
 	$poster = get_the_post_thumbnail_url( $post_id, 'large' );
 	?>
 	<div class="svc-player" data-vimeo-id="<?php echo esc_attr( $vimeo_id ); ?>" data-title="<?php echo esc_attr( $title ); ?>">
@@ -340,6 +360,16 @@ add_action( 'wp_enqueue_scripts', function () {
 	wp_enqueue_style( 'svc-video-center', SVC_PLUGIN_URL . 'assets/video-center.css', array(), SVC_VERSION );
 	wp_enqueue_script( 'svc-player', SVC_PLUGIN_URL . 'assets/player.js', array(), SVC_VERSION, true );
 } );
+
+// Single pages embed the Vimeo player immediately — warm the connections early.
+add_action( 'wp_head', function () {
+	if ( ! is_singular( SVC_Post_Type::POST_TYPE ) ) {
+		return;
+	}
+	foreach ( array( 'https://player.vimeo.com', 'https://i.vimeocdn.com', 'https://f.vimeocdn.com' ) as $svc_origin ) {
+		printf( '<link rel="preconnect" href="%s" crossorigin>' . "\n", esc_url( $svc_origin ) );
+	}
+}, 3 );
 
 // Apply the configured per-page count to the archive.
 add_action( 'pre_get_posts', function ( $query ) {
