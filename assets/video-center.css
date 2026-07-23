@@ -65,23 +65,25 @@
 	border: 0;
 }
 
-/* Theme page-title banner, hidden on single video pages: it renders the
-   video's own poster as a hero above the player and competes with it as
-   the page's main content. The markup still renders (its PHP closes theme
-   wrappers), so it is hidden rather than skipped. */
+/* Theme page-title banner, collapsed on single video pages: at full size
+   (50vh) it renders the video's own poster as a hero above the player and
+   competes with it as the page's main content. It can't be removed outright:
+   the theme's menu is absolutely positioned over it and styled for an image
+   backdrop, and the banner provides all the clearance under that floating
+   menu. So keep it as a slim strip — background intact for menu contrast,
+   title hidden (also blanked server-side). */
 .svc-no-banner .page-header {
+	height: 10rem;
+	min-height: 0;
+}
+
+.svc-no-banner .page-header .page-header-title {
 	display: none;
 }
 
-/* The banner used to separate the site header from the content;
-   restore that breathing room where it's hidden. */
-.svc-no-banner .content-area {
-	padding-top: 2rem;
-}
-
 @media (max-width: 639px) {
-	.svc-no-banner .content-area {
-		padding-top: 1.25rem;
+	.svc-no-banner .page-header {
+		height: 7rem;
 	}
 }
 

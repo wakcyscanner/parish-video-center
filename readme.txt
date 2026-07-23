@@ -73,7 +73,7 @@ Plugin options and scheduled events are removed. Video posts and sideloaded medi
 == Changelog ==
 
 = 1.10.0 =
-* Stronger watch-page signals for Google video indexing, addressing "video is supplementary content" verdicts: the VideoObject now declares mainEntityOfPage; the embed URL is identical across JSON-LD, Open Graph, and the player iframe; and the theme's page-title banner is hidden on single video pages (it rendered the video's own poster as a hero above the player, competing with it as main content — the video title now renders below the player instead). Return false from the svc_suppress_theme_banner filter to keep the banner.
+* Stronger watch-page signals for Google video indexing, addressing "video is supplementary content" verdicts: the VideoObject now declares mainEntityOfPage; the embed URL is identical across JSON-LD, Open Graph, and the player iframe; and the theme's page-title banner is collapsed to a slim strip on single video pages (at full size it rendered the video's own poster as a half-viewport hero above the player, competing with it as main content — the video title now renders below the player instead, and the strip keeps the theme's floating menu legible). Return false from the svc_suppress_theme_banner filter to keep the full banner.
 
 = 1.9.0 =
 * Single video pages now embed the Vimeo player directly instead of the click-to-play facade, so Google's video indexing recognizes them as watch pages (a facade contains no player element for crawlers, which was causing "page is not a watch page" feedback in Search Console). Preconnect hints offset the performance cost; the facade remains on archive, embeds, and sliders. Return 'facade' from the svc_single_player_mode filter to restore the old behavior.
