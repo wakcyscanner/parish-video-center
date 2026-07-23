@@ -221,6 +221,16 @@
 	}
 }
 
+/* The theme's .limit-width (width: 80%) is a desktop reading measure but
+   applies at every viewport, squeezing the player on phones and tablets.
+   Below the desktop breakpoint, let the video page's main column run full
+   width — .svc-wrap supplies its own side padding. */
+@media (max-width: 1023px) {
+	.single-svc_video main.limit-width {
+		width: 100%;
+	}
+}
+
 /* Video info */
 .svc-info {
 	margin-bottom: 2rem;
