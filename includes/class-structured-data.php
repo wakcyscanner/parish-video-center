@@ -40,8 +40,14 @@ class SVC_Structured_Data {
 			'name'            => get_the_title( $post ),
 			'description'     => wp_strip_all_tags( $post->post_content ),
 			'uploadDate'      => get_post_time( 'c', true, $post ),
-			'embedUrl'        => 'https://player.vimeo.com/video/' . $vimeo_id,
+			// Identical to the iframe src so every signal names one URL.
+			'embedUrl'        => 'https://player.vimeo.com/video/' . $vimeo_id . '?dnt=1',
 			'url'             => get_permalink( $post ),
+			// Declares this a watch page: the video IS the page's main content.
+			'mainEntityOfPage' => array(
+				'@type' => 'WebPage',
+				'@id'   => get_permalink( $post ),
+			),
 			'publisher'       => array(
 				'@type' => 'Organization',
 				'name'  => $settings['publisher'],

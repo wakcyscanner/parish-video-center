@@ -65,6 +65,29 @@
 	border: 0;
 }
 
+/* Theme page-title banner, collapsed on single video pages: at full size
+   (50vh) it renders the video's own poster as a hero above the player and
+   competes with it as the page's main content. It can't be removed outright:
+   the theme's menu is absolutely positioned over it, and the banner provides
+   all the clearance under that floating menu. So keep it as a slim plain
+   strip, title hidden (also blanked server-side). */
+.svc-no-banner .page-header {
+	height: 5rem;
+	min-height: 0;
+	background-image: none !important; /* the poster is set as an inline style */
+	background-color: #fff;
+}
+
+.svc-no-banner .page-header .page-header-title {
+	display: none;
+}
+
+@media (max-width: 639px) {
+	.svc-no-banner .page-header {
+		height: 3.5rem;
+	}
+}
+
 /* Split hero on the archive landing page */
 .svc-hero {
 	display: grid;
@@ -195,6 +218,16 @@
 	.svc-hero {
 		grid-template-columns: 1fr;
 		gap: 1.25rem;
+	}
+}
+
+/* The theme's .limit-width (width: 80%) is a desktop reading measure but
+   applies at every viewport, squeezing the player on phones and tablets.
+   Below the desktop breakpoint, let the video page's main column run full
+   width — .svc-wrap supplies its own side padding. */
+@media (max-width: 1023px) {
+	.single-svc_video main.limit-width {
+		width: 100%;
 	}
 }
 

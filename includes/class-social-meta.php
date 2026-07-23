@@ -29,7 +29,7 @@ class SVC_Social_Meta {
 			return;
 		}
 
-		$player      = 'https://player.vimeo.com/video/' . rawurlencode( $vimeo_id );
+		$player      = 'https://player.vimeo.com/video/' . rawurlencode( $vimeo_id ) . '?dnt=1';
 		$title       = get_the_title( $post );
 		$description = '' !== trim( (string) $post->post_content )
 			? wp_trim_words( wp_strip_all_tags( $post->post_content ), 30 )

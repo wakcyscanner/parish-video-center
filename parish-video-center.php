@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Parish Video Center
  * Description: Syncs a Vimeo showcase into WordPress video posts with a gallery archive, single video pages, and VideoObject structured data. Post labels and URL slug are configurable (Homilies, Sermons, Messages, …).
- * Version: 1.9.0
+ * Version: 1.10.0-beta.5
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Author: St. Paul the Apostle Catholic Church
@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'SVC_VERSION', '1.9.0' );
+define( 'SVC_VERSION', '1.10.0-beta.5' );
 define( 'SVC_PLUGIN_FILE', __FILE__ );
 define( 'SVC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SVC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -303,19 +303,53 @@ function svc_get_footer() {
 }
 
 /**
+ * Whether the theme's page-title banner should be suppressed on this view.
+ * Default: suppressed on single video pages — there the banner renders the
+ * video's own poster as a hero above the player, which makes search engines
+ * classify the video as supplementary content rather than the page's main
+ * content (Google "watch page" determination).
+ */
+function svc_suppress_theme_banner() {
+	return (bool) apply_filters( 'svc_suppress_theme_banner', is_singular( SVC_Post_Type::POST_TYPE ) );
+}
+
+/**
  * Render the theme's page-header partial when it provides one. Diocesan themes
  * (Celine et al.) put the page-title banner there — and it also closes the
  * .site-content div that their header.php opens, so on those themes skipping it
- * breaks the document structure. Returns true when rendered so templates can
- * skip their own <h1> (the banner already shows the title).
+ * breaks the document structure. Returns true when the banner is visible so
+ * templates can skip their own <h1> (the banner already shows the title).
+ *
+ * When suppressed (see svc_suppress_theme_banner()), the partial still renders
+ * — its structural side effects must happen — but with a blanked title and
+ * hidden via the svc-no-banner body class, and this returns false so the
+ * template renders its own <h1>.
  */
 function svc_theme_page_header() {
-	if ( locate_template( 'template-parts/headers/page-header.php' ) ) {
-		get_template_part( 'template-parts/headers/page-header' );
-		return true;
+	if ( ! locate_template( 'template-parts/headers/page-header.php' ) ) {
+		return false;
 	}
-	return false;
+
+	if ( svc_suppress_theme_banner() ) {
+		add_filter( 'the_title', '__return_empty_string', 100 );
+		add_filter( 'single_post_title', '__return_empty_string', 100 );
+		get_template_part( 'template-parts/headers/page-header' );
+		remove_filter( 'the_title', '__return_empty_string', 100 );
+		remove_filter( 'single_post_title', '__return_empty_string', 100 );
+		return false;
+	}
+
+	get_template_part( 'template-parts/headers/page-header' );
+	return true;
 }
+
+// Body class that hides the (structurally required) banner markup via CSS.
+add_filter( 'body_class', function ( $classes ) {
+	if ( is_singular( SVC_Post_Type::POST_TYPE ) && svc_suppress_theme_banner() ) {
+		$classes[] = 'svc-no-banner';
+	}
+	return $classes;
+} );
 
 register_activation_hook( __FILE__, function () {
 	SVC_Post_Type::register();
