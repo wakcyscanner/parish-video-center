@@ -73,6 +73,18 @@
 	display: none;
 }
 
+/* The banner used to separate the site header from the content;
+   restore that breathing room where it's hidden. */
+.svc-no-banner .content-area {
+	padding-top: 2rem;
+}
+
+@media (max-width: 639px) {
+	.svc-no-banner .content-area {
+		padding-top: 1.25rem;
+	}
+}
+
 /* Split hero on the archive landing page */
 .svc-hero {
 	display: grid;
