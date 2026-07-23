@@ -65,6 +65,14 @@
 	border: 0;
 }
 
+/* Theme page-title banner, hidden on single video pages: it renders the
+   video's own poster as a hero above the player and competes with it as
+   the page's main content. The markup still renders (its PHP closes theme
+   wrappers), so it is hidden rather than skipped. */
+.svc-no-banner .page-header {
+	display: none;
+}
+
 /* Split hero on the archive landing page */
 .svc-hero {
 	display: grid;
