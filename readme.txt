@@ -4,7 +4,7 @@ Tags: vimeo, video, sermons, homilies, church
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.9.0
+Stable tag: 1.10.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -74,6 +74,7 @@ Plugin options and scheduled events are removed. Video posts and sideloaded medi
 
 = 1.10.0 =
 * Stronger watch-page signals for Google video indexing, addressing "video is supplementary content" verdicts: the VideoObject now declares mainEntityOfPage; the embed URL is identical across JSON-LD, Open Graph, and the player iframe; and the theme's page-title banner is collapsed to a slim strip on single video pages (at full size it rendered the video's own poster as a half-viewport hero above the player, competing with it as main content — the video title now renders below the player instead, and the strip keeps the theme's floating menu legible). Return false from the svc_suppress_theme_banner filter to keep the full banner.
+* The player runs full width on phones and tablets: the theme's 80% reading-measure width is now only applied to video pages at desktop sizes, which also improves the player's mobile prominence for indexing.
 
 = 1.9.0 =
 * Single video pages now embed the Vimeo player directly instead of the click-to-play facade, so Google's video indexing recognizes them as watch pages (a facade contains no player element for crawlers, which was causing "page is not a watch page" feedback in Search Console). Preconnect hints offset the performance cost; the facade remains on archive, embeds, and sliders. Return 'facade' from the svc_single_player_mode filter to restore the old behavior.
