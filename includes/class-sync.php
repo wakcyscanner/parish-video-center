@@ -157,6 +157,17 @@ class SVC_Sync {
 			update_post_meta( $post_id, '_vimeo_id', $vimeo_id );
 			update_post_meta( $post_id, '_vimeo_duration', $duration );
 
+			// Direct progressive .mp4 link (Vimeo plans with file links only):
+			// becomes schema contentUrl / sitemap content_loc, Google's
+			// preferred fetch target for video indexing. Refreshed every sync
+			// so the signed URL stays current; cleared if the plan loses it.
+			$file_url = self::progressive_file( $video );
+			if ( $file_url ) {
+				update_post_meta( $post_id, '_vimeo_file_url', $file_url );
+			} else {
+				delete_post_meta( $post_id, '_vimeo_file_url' );
+			}
+
 			if ( $thumbnail && get_post_meta( $post_id, '_vimeo_thumbnail_src', true ) !== $thumbnail ) {
 				$attachment_id = self::sideload_thumbnail( $thumbnail, $post_id, $title, $vimeo_id );
 				if ( $attachment_id ) {
@@ -216,6 +227,45 @@ class SVC_Sync {
 			return $matches[1];
 		}
 		return '';
+	}
+
+	/**
+	 * Highest-resolution progressive .mp4 link from the video's files list,
+	 * or '' when the account's plan/token doesn't expose file links.
+	 */
+	private static function progressive_file( $video ) {
+		if ( empty( $video['files'] ) || ! is_array( $video['files'] ) ) {
+			return '';
+		}
+
+		$best        = '';
+		$best_height = -1;
+
+		foreach ( $video['files'] as $file ) {
+			if ( ! is_array( $file ) || empty( $file['link'] ) ) {
+				continue;
+			}
+
+			// Progressive downloads only — playlist formats aren't a valid
+			// contentUrl target.
+			$quality = isset( $file['quality'] ) ? $file['quality'] : '';
+			if ( in_array( $quality, array( 'hls', 'dash' ), true ) ) {
+				continue;
+			}
+
+			$type = isset( $file['type'] ) ? $file['type'] : '';
+			if ( $type && false === strpos( $type, 'mp4' ) ) {
+				continue;
+			}
+
+			$height = isset( $file['height'] ) ? (int) $file['height'] : 0;
+			if ( $height > $best_height ) {
+				$best_height = $height;
+				$best        = $file['link'];
+			}
+		}
+
+		return $best;
 	}
 
 	/**

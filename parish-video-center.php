@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Parish Video Center
  * Description: Syncs a Vimeo showcase into WordPress video posts with a gallery archive, single video pages, and VideoObject structured data. Post labels and URL slug are configurable (Homilies, Sermons, Messages, …).
- * Version: 1.10.0
+ * Version: 1.11.0-beta.1
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Author: St. Paul the Apostle Catholic Church
@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'SVC_VERSION', '1.10.0' );
+define( 'SVC_VERSION', '1.11.0-beta.1' );
 define( 'SVC_PLUGIN_FILE', __FILE__ );
 define( 'SVC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SVC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -58,6 +58,7 @@ function svc_get_settings() {
 		'slug'           => 'videos',
 		'publisher'      => get_bloginfo( 'name' ),
 		'per_page'       => 12,
+		'related_count'  => 4,
 		'sync_frequency' => 'hourly',
 		'update_channel' => 'stable',
 	);
@@ -128,10 +129,17 @@ function svc_render_player( $post_id, $mode = 'facade' ) {
 	$title = get_the_title( $post_id );
 
 	if ( 'embed' === $mode ) {
+		// width/height give the crawler's renderer an intrinsic 16:9 size
+		// before CSS applies (instead of the 300×150 iframe default), and
+		// loading=eager + skip-lazy + data-no-lazy keep optimization plugins
+		// (WP Rocket/AccelerateWP, Jetpack, …) from rewriting src to a
+		// data-lazy-src placeholder — which would leave crawlers no player
+		// and fail Google's watch-page determination.
 		?>
 		<div class="svc-player svc-playing">
 			<iframe src="<?php echo esc_url( 'https://player.vimeo.com/video/' . rawurlencode( $vimeo_id ) . '?dnt=1' ); ?>"
 				title="<?php echo esc_attr( $title ); ?>"
+				width="1280" height="720" loading="eager" class="skip-lazy" data-no-lazy="1"
 				allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>
 		</div>
 		<?php
@@ -218,9 +226,16 @@ function svc_render_tile( $tile_post ) {
 /**
  * Render the recirculation module: a grid of other recent videos with
  * thumbnail tiles, shown at the bottom of single video pages. The count
- * is filterable via 'svc_related_count'; 0 disables the module.
+ * comes from the "Related Videos" setting unless passed explicitly, and is
+ * filterable via 'svc_related_count'; 0 disables the module.
  */
-function svc_render_related( $post_id, $count = 4 ) {
+function svc_render_related( $post_id, $count = null ) {
+	$settings = svc_get_settings();
+
+	if ( null === $count ) {
+		$count = (int) $settings['related_count'];
+	}
+
 	$count = (int) apply_filters( 'svc_related_count', $count, $post_id );
 	if ( $count < 1 ) {
 		return;
@@ -240,8 +255,7 @@ function svc_render_related( $post_id, $count = 4 ) {
 		return;
 	}
 
-	$settings = svc_get_settings();
-	$plural   = '' !== trim( $settings['plural'] ) ? $settings['plural'] : 'Videos';
+	$plural = '' !== trim( $settings['plural'] ) ? $settings['plural'] : 'Videos';
 	/* translators: %s: plural video label */
 	$heading = sprintf( __( 'More %s', 'parish-video-center' ), $plural );
 	?>
@@ -393,6 +407,16 @@ add_action( 'wp_enqueue_scripts', function () {
 
 	wp_enqueue_style( 'svc-video-center', SVC_PLUGIN_URL . 'assets/video-center.css', array(), SVC_VERSION );
 	wp_enqueue_script( 'svc-player', SVC_PLUGIN_URL . 'assets/player.js', array(), SVC_VERSION, true );
+} );
+
+// If WP Rocket / AccelerateWP iframe lazy-loading is ever enabled, keep the
+// watch-page player out of it: rewriting src to data-lazy-src leaves crawlers
+// with no player, failing Google's watch-page determination.
+add_filter( 'rocket_lazyload_iframe_excluded_patterns', function ( $patterns ) {
+	$patterns   = is_array( $patterns ) ? $patterns : array();
+	$patterns[] = 'data-no-lazy';
+	$patterns[] = 'player.vimeo.com';
+	return $patterns;
 } );
 
 // Single pages embed the Vimeo player immediately — warm the connections early.

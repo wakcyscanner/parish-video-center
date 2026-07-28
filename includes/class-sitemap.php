@@ -86,7 +86,13 @@ class SVC_Sitemap {
 			echo "\t\t\t<video:thumbnail_loc>" . esc_url( $thumbnail ) . "</video:thumbnail_loc>\n";
 			echo "\t\t\t<video:title>" . esc_xml( $title ) . "</video:title>\n";
 			echo "\t\t\t<video:description>" . esc_xml( $description ) . "</video:description>\n";
-			echo "\t\t\t<video:player_loc>" . esc_url( 'https://player.vimeo.com/video/' . rawurlencode( $vimeo_id ) ) . "</video:player_loc>\n";
+			// content_loc must precede player_loc in the video sitemap schema.
+			$file_url = get_post_meta( $post->ID, '_vimeo_file_url', true );
+			if ( $file_url ) {
+				echo "\t\t\t<video:content_loc>" . esc_url( $file_url ) . "</video:content_loc>\n";
+			}
+			// ?dnt=1 keeps this byte-identical to the iframe src and JSON-LD embedUrl.
+			echo "\t\t\t<video:player_loc>" . esc_url( 'https://player.vimeo.com/video/' . rawurlencode( $vimeo_id ) . '?dnt=1' ) . "</video:player_loc>\n";
 			if ( $duration > 0 && $duration <= 28800 ) {
 				echo "\t\t\t<video:duration>" . (int) $duration . "</video:duration>\n";
 			}

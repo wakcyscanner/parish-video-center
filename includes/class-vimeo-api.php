@@ -19,17 +19,28 @@ class SVC_Vimeo_API {
 		$videos = array();
 		$page   = 1;
 
+		// 'files' (direct .mp4 links, used for schema contentUrl) requires the
+		// video_files token scope and a Vimeo plan that offers file links.
+		$fields = 'uri,name,description,created_time,duration,pictures.sizes,files';
+
 		do {
-			$body = self::request(
-				$showcase_id,
-				array(
-					'sort'      => 'date',
-					'direction' => 'desc',
-					'per_page'  => 50,
-					'page'      => $page,
-					'fields'    => 'uri,name,description,created_time,duration,pictures.sizes',
-				)
+			$query = array(
+				'sort'      => 'date',
+				'direction' => 'desc',
+				'per_page'  => 50,
+				'page'      => $page,
+				'fields'    => $fields,
 			);
+
+			$body = self::request( $showcase_id, $query );
+
+			// If the account can't serve 'files', drop it and retry rather
+			// than failing the whole sync over an optional field.
+			if ( is_wp_error( $body ) && false !== strpos( $fields, ',files' ) ) {
+				$fields          = str_replace( ',files', '', $fields );
+				$query['fields'] = $fields;
+				$body            = self::request( $showcase_id, $query );
+			}
 
 			if ( is_wp_error( $body ) ) {
 				return $body;
