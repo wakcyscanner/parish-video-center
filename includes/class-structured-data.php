@@ -58,6 +58,13 @@ class SVC_Structured_Data {
 			),
 		);
 
+		// Direct .mp4 link when the Vimeo plan provides one — Google's
+		// preferred video fetch target, stronger than embedUrl alone.
+		$file_url = get_post_meta( $post->ID, '_vimeo_file_url', true );
+		if ( $file_url ) {
+			$data['contentUrl'] = $file_url;
+		}
+
 		$thumbnail = get_the_post_thumbnail_url( $post, 'full' );
 		if ( $thumbnail ) {
 			$data['thumbnailUrl'] = array( $thumbnail );

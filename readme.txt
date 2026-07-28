@@ -72,6 +72,12 @@ Plugin options and scheduled events are removed. Video posts and sideloaded medi
 
 == Changelog ==
 
+= 1.11.0 =
+* Direct video file URLs: on Vimeo plans that expose file links, sync now stores each video's highest-resolution progressive .mp4 and emits it as VideoObject contentUrl and video sitemap content_loc — Google's preferred fetch target for video indexing, so it no longer depends solely on crawling the embedded player. Accounts without file links are unaffected (sync silently retries without the field).
+* New "Related Videos" setting controls how many other videos appear at the bottom of single video pages; 0 hides the module, for sites where Google keeps ruling the video "not the main content" because of the equal-prominence thumbnail grid.
+* Watch-page player hardening: the embed iframe now carries intrinsic width/height (no 300×150 fallback while CSS loads), loading="eager", and skip-lazy/data-no-lazy markers plus a WP Rocket/AccelerateWP exclusion, so iframe lazy-loading features can never rewrite the player out of the crawled HTML.
+* The video sitemap's player_loc now matches the iframe src and JSON-LD embedUrl byte-for-byte (?dnt=1 included).
+
 = 1.10.0 =
 * Stronger watch-page signals for Google video indexing, addressing "video is supplementary content" verdicts: the VideoObject now declares mainEntityOfPage; the embed URL is identical across JSON-LD, Open Graph, and the player iframe; and the theme's page-title banner is collapsed to a slim strip on single video pages (at full size it rendered the video's own poster as a half-viewport hero above the player, competing with it as main content — the video title now renders below the player instead, and the strip keeps the theme's floating menu legible). Return false from the svc_suppress_theme_banner filter to keep the full banner.
 * The player runs full width on phones and tablets: the theme's 80% reading-measure width is now only applied to video pages at desktop sizes, which also improves the player's mobile prominence for indexing.

@@ -95,6 +95,7 @@ class SVC_Settings {
 			'slug'           => $slug,
 			'publisher'      => isset( $input['publisher'] ) ? sanitize_text_field( $input['publisher'] ) : $current['publisher'],
 			'per_page'       => isset( $input['per_page'] ) ? min( 48, max( 1, (int) $input['per_page'] ) ) : $current['per_page'],
+			'related_count'  => isset( $input['related_count'] ) ? min( 12, max( 0, (int) $input['related_count'] ) ) : $current['related_count'],
 			'sync_frequency' => $frequency,
 			'update_channel' => ( isset( $input['update_channel'] ) && 'beta' === $input['update_channel'] ) ? 'beta' : 'stable',
 		);
@@ -272,6 +273,13 @@ class SVC_Settings {
 					<tr>
 						<th scope="row"><label for="svc-per-page"><?php esc_html_e( 'Videos Per Page', 'parish-video-center' ); ?></label></th>
 						<td><input type="number" id="svc-per-page" name="svc_settings[per_page]" value="<?php echo esc_attr( $settings['per_page'] ); ?>" min="1" max="48" class="small-text"></td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="svc-related-count"><?php esc_html_e( 'Related Videos', 'parish-video-center' ); ?></label></th>
+						<td>
+							<input type="number" id="svc-related-count" name="svc_settings[related_count]" value="<?php echo esc_attr( $settings['related_count'] ); ?>" min="0" max="12" class="small-text">
+							<p class="description"><?php esc_html_e( 'How many other videos to show at the bottom of a single video page. Set to 0 to hide the module — worth testing if Search Console keeps ruling the video "not the main content" of its page.', 'parish-video-center' ); ?></p>
+						</td>
 					</tr>
 					<tr>
 						<th scope="row"><label for="svc-frequency"><?php esc_html_e( 'Sync Frequency', 'parish-video-center' ); ?></label></th>
