@@ -72,6 +72,9 @@ Plugin options and scheduled events are removed. Video posts and sideloaded medi
 
 == Changelog ==
 
+= 1.12.0 =
+* Single video pages now serve only the first line of the description; the remainder is fetched over a REST endpoint when a visitor clicks "Read more", and is otherwise absent from the page HTML entirely. This makes the served page read as "player plus caption" rather than an article with an embedded video — Google kept classifying the full-text pages' videos as supplementary content. Write descriptions so their first line stands alone as an excerpt. The full description still feeds the VideoObject JSON-LD, social meta, and the video sitemap.
+
 = 1.11.0 =
 * Direct video file URLs: on Vimeo plans that expose file links, sync now stores each video's highest-resolution progressive .mp4 and emits it as VideoObject contentUrl and video sitemap content_loc — Google's preferred fetch target for video indexing, so it no longer depends solely on crawling the embedded player. Accounts without file links are unaffected (sync silently retries without the field).
 * New "Related Videos" setting controls how many other videos appear at the bottom of single video pages; 0 hides the module, for sites where Google keeps ruling the video "not the main content" because of the equal-prominence thumbnail grid.
