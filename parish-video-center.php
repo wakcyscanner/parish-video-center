@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Parish Video Center
  * Description: Syncs a Vimeo showcase into WordPress video posts with a gallery archive, single video pages, and VideoObject structured data. Post labels and URL slug are configurable (Homilies, Sermons, Messages, …).
- * Version: 1.11.0
+ * Version: 1.12.0-beta.1
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Author: St. Paul the Apostle Catholic Church
@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'SVC_VERSION', '1.11.0' );
+define( 'SVC_VERSION', '1.12.0-beta.1' );
 define( 'SVC_PLUGIN_FILE', __FILE__ );
 define( 'SVC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SVC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -31,6 +31,7 @@ require_once SVC_PLUGIN_DIR . 'includes/class-updates.php';
 require_once SVC_PLUGIN_DIR . 'includes/class-social-meta.php';
 require_once SVC_PLUGIN_DIR . 'includes/class-sitemap.php';
 require_once SVC_PLUGIN_DIR . 'includes/class-embeds.php';
+require_once SVC_PLUGIN_DIR . 'includes/class-rest.php';
 
 SVC_Post_Type::init();
 SVC_Sync::init();
@@ -42,6 +43,7 @@ SVC_Updates::init();
 SVC_Social_Meta::init();
 SVC_Sitemap::init();
 SVC_Embeds::init();
+SVC_Rest::init();
 
 /**
  * Get plugin settings merged with defaults.
@@ -163,16 +165,53 @@ function svc_render_player( $post_id, $mode = 'facade' ) {
 }
 
 /**
- * Render a video description: Vimeo descriptions are plain text, so escape,
- * linkify URLs, and convert line breaks to paragraphs.
+ * Format plain-text description content: Vimeo descriptions are plain text,
+ * so escape, linkify URLs, and convert line breaks to paragraphs.
  */
-function svc_render_description( $post ) {
-	$text = is_object( $post ) ? $post->post_content : '';
+function svc_format_description_text( $text ) {
 	if ( '' === trim( (string) $text ) ) {
 		return '';
 	}
 
 	return wp_kses_post( wpautop( make_clickable( esc_html( $text ) ) ) );
+}
+
+/**
+ * Render a video's full description.
+ */
+function svc_render_description( $post ) {
+	return svc_format_description_text( is_object( $post ) ? $post->post_content : '' );
+}
+
+/**
+ * Split a description into its first non-empty line and the remainder.
+ * Single video pages render only the first line server-side (the rest is
+ * fetched on "Read more"), so descriptions should open with a line that
+ * works as an excerpt.
+ *
+ * @return array{0: string, 1: string} First line, remainder ('' when none).
+ */
+function svc_description_split( $post ) {
+	$text = is_object( $post ) ? trim( (string) $post->post_content ) : '';
+	if ( '' === $text ) {
+		return array( '', '' );
+	}
+
+	$lines = preg_split( '/\r?\n/', $text );
+	$first = '';
+	$index = 0;
+
+	foreach ( $lines as $i => $line ) {
+		if ( '' !== trim( $line ) ) {
+			$first = trim( $line );
+			$index = $i;
+			break;
+		}
+	}
+
+	$rest = trim( implode( "\n", array_slice( $lines, $index + 1 ) ) );
+
+	return array( $first, $rest );
 }
 
 /**

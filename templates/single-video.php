@@ -36,7 +36,26 @@ while ( have_posts() ) :
 						<h1 class="svc-title"><?php the_title(); ?></h1>
 					<?php endif; ?>
 					<div class="svc-meta"><?php echo esc_html( get_the_date() ); ?></div>
-					<div class="svc-description"><?php echo svc_render_description( get_post() ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in svc_render_description(). ?></div>
+					<?php
+					/*
+					 * Only the description's first line is served; the rest is
+					 * fetched on demand via REST. Deliberate: the full text in
+					 * the HTML makes Google classify the page as an article
+					 * with a supplementary video instead of a watch page.
+					 */
+					list( $svc_desc_first, $svc_desc_rest ) = svc_description_split( get_post() );
+					?>
+					<div class="svc-description" id="svc-description-<?php the_ID(); ?>"><?php echo svc_format_description_text( $svc_desc_first ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in svc_format_description_text(). ?></div>
+					<?php if ( '' !== $svc_desc_rest ) : ?>
+						<p class="svc-read-more-wrap">
+							<button type="button" class="svc-read-more"
+								aria-expanded="false"
+								aria-controls="svc-description-<?php the_ID(); ?>"
+								data-endpoint="<?php echo esc_url( rest_url( 'parish-video-center/v1/description/' . get_the_ID() ) ); ?>">
+								<?php esc_html_e( 'Read more', 'parish-video-center' ); ?>
+							</button>
+						</p>
+					<?php endif; ?>
 					<p class="svc-back">
 						<a href="<?php echo esc_url( get_post_type_archive_link( SVC_Post_Type::POST_TYPE ) ); ?>">&larr; <?php
 							/* translators: %s: plural video label */

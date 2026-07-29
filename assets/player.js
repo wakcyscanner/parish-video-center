@@ -46,4 +46,31 @@
 			loadPlayer(player);
 		}
 	});
+
+	// "Read more" on single video pages: the description past the first line
+	// is not in the served HTML at all — fetch it on demand.
+	document.addEventListener('click', function (e) {
+		var btn = e.target.closest && e.target.closest('.svc-read-more');
+		if (!btn || btn.disabled) return;
+
+		var endpoint = btn.getAttribute('data-endpoint');
+		var target = document.getElementById(btn.getAttribute('aria-controls'));
+		if (!endpoint || !target) return;
+
+		btn.disabled = true;
+		fetch(endpoint)
+			.then(function (res) {
+				if (!res.ok) throw new Error(res.status);
+				return res.json();
+			})
+			.then(function (data) {
+				target.innerHTML = data.html;
+				btn.setAttribute('aria-expanded', 'true');
+				var wrap = btn.closest('.svc-read-more-wrap');
+				(wrap || btn).remove();
+			})
+			.catch(function () {
+				btn.disabled = false;
+			});
+	});
 })();
