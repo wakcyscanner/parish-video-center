@@ -15,7 +15,10 @@ class SVC_Redirects {
 	}
 
 	public static function deep_link() {
-		if ( ! is_post_type_archive( SVC_Post_Type::POST_TYPE ) || empty( $_GET['v'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		// Topic landing pages included: the pre-topics archive URL (where old
+		// deep links point) is now a topic page.
+		if ( ( ! is_post_type_archive( SVC_Post_Type::POST_TYPE ) && ! is_tax( SVC_Topics::TAXONOMY ) )
+			|| empty( $_GET['v'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 			return;
 		}
 

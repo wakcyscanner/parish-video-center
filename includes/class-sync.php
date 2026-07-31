@@ -11,6 +11,7 @@ class SVC_Sync {
 
 	const CRON_HOOK   = 'svc_sync_event';
 	const FREQUENCIES = array( 'hourly', 'twicedaily', 'daily', 'weekly' );
+	const LOCK        = 'svc_sync_running';
 
 	public static function init() {
 		add_action( self::CRON_HOOK, array( __CLASS__, 'run' ) );
@@ -44,7 +45,10 @@ class SVC_Sync {
 		check_admin_referer( 'svc_sync_now' );
 
 		$result = self::run();
-		$flag   = is_wp_error( $result ) ? 'error' : 'ok';
+		$flag   = 'ok';
+		if ( is_wp_error( $result ) ) {
+			$flag = 'svc_sync_running' === $result->get_error_code() ? 'locked' : 'error';
+		}
 
 		wp_safe_redirect( add_query_arg( 'svc-synced', $flag, SVC_Settings::url() ) );
 		exit;
@@ -53,23 +57,84 @@ class SVC_Sync {
 	/**
 	 * Run a full sync: upsert posts, sideload changed thumbnails, draft removed videos.
 	 *
+	 * A run can hold a PHP worker for a while (Vimeo API paging across every
+	 * topic's showcase, thumbnail downloads and resizing), so overlapping runs
+	 * — hourly cron colliding with a manual Sync Now, or slow runs stacking up
+	 * — are refused via a lock. The lock expires on its own so a fatally
+	 * interrupted run can't wedge syncing for good.
+	 *
 	 * @return true|WP_Error
 	 */
 	public static function run() {
+		if ( get_transient( self::LOCK ) ) {
+			return new WP_Error( 'svc_sync_running', __( 'A sync is already running — skipped this one.', 'parish-video-center' ) );
+		}
+		set_transient( self::LOCK, time(), 10 * MINUTE_IN_SECONDS );
+
+		$result = self::run_unlocked();
+
+		delete_transient( self::LOCK );
+
+		return $result;
+	}
+
+	/**
+	 * The sync itself; callers must hold the lock (see run()).
+	 *
+	 * @return true|WP_Error
+	 */
+	private static function run_unlocked() {
 		$settings = svc_get_settings();
 
-		$videos = SVC_Vimeo_API::fetch_showcase_videos( $settings['showcase_id'] );
-		if ( is_wp_error( $videos ) ) {
-			update_option(
-				'svc_last_sync',
+		// Showcase-backed topics drive the sync; a site not yet using topics
+		// falls back to the legacy single-showcase setting (no term handling).
+		$topics = SVC_Topics::synced_topics();
+		$legacy = empty( $topics );
+		if ( $legacy ) {
+			$topics = array(
 				array(
-					'time'    => time(),
-					'status'  => 'error',
-					'message' => $videos->get_error_message(),
+					'term_id'     => 0,
+					'showcase_id' => $settings['showcase_id'],
+					'name'        => '',
 				),
-				false
 			);
-			return $videos;
+		}
+
+		// Fetch every showcase up front. Any failure aborts the whole run:
+		// proceeding would draft all videos of the showcase that didn't load.
+		$videos_by_id = array();
+		$terms_by_id  = array();
+
+		foreach ( $topics as $topic ) {
+			$videos = SVC_Vimeo_API::fetch_showcase_videos( $topic['showcase_id'] );
+			if ( is_wp_error( $videos ) ) {
+				$message = $topic['name']
+					? sprintf( '%s: %s', $topic['name'], $videos->get_error_message() )
+					: $videos->get_error_message();
+				update_option(
+					'svc_last_sync',
+					array(
+						'time'    => time(),
+						'status'  => 'error',
+						'message' => $message,
+					),
+					false
+				);
+				return $videos;
+			}
+
+			foreach ( $videos as $video ) {
+				$vimeo_id = self::extract_id( isset( $video['uri'] ) ? $video['uri'] : '' );
+				if ( ! $vimeo_id ) {
+					continue;
+				}
+				if ( ! isset( $videos_by_id[ $vimeo_id ] ) ) {
+					$videos_by_id[ $vimeo_id ] = $video;
+				}
+				if ( $topic['term_id'] ) {
+					$terms_by_id[ $vimeo_id ][] = $topic['term_id'];
+				}
+			}
 		}
 
 		// Map existing posts by Vimeo ID (any non-trashed status, so drafted videos re-publish on return).
@@ -90,18 +155,15 @@ class SVC_Sync {
 			}
 		}
 
-		$created    = 0;
-		$updated    = 0;
-		$drafted    = 0;
-		$locked     = 0;
-		$thumbnails = 0;
-		$seen       = array();
+		$created     = 0;
+		$updated     = 0;
+		$drafted     = 0;
+		$locked      = 0;
+		$thumbnails  = 0;
+		$seen        = array();
+		$synced_term_ids = $legacy ? array() : SVC_Topics::synced_term_ids();
 
-		foreach ( $videos as $video ) {
-			$vimeo_id = self::extract_id( isset( $video['uri'] ) ? $video['uri'] : '' );
-			if ( ! $vimeo_id ) {
-				continue;
-			}
+		foreach ( $videos_by_id as $vimeo_id => $video ) {
 			$seen[ $vimeo_id ] = true;
 
 			$title        = isset( $video['name'] ) ? $video['name'] : '';
@@ -168,7 +230,28 @@ class SVC_Sync {
 				delete_post_meta( $post_id, '_vimeo_file_url' );
 			}
 
-			if ( $thumbnail && get_post_meta( $post_id, '_vimeo_thumbnail_src', true ) !== $thumbnail ) {
+			// Topic membership: sync owns the showcase-backed topics — replace
+			// those — but never touches manually curated ones.
+			if ( ! $legacy ) {
+				$current = wp_get_object_terms( $post_id, SVC_Topics::TAXONOMY, array( 'fields' => 'ids' ) );
+				$manual  = is_wp_error( $current )
+					? array()
+					: array_diff( array_map( 'intval', $current ), $synced_term_ids );
+				$wanted  = isset( $terms_by_id[ $vimeo_id ] ) ? $terms_by_id[ $vimeo_id ] : array();
+				wp_set_object_terms(
+					$post_id,
+					array_values( array_unique( array_merge( $manual, $wanted ) ) ),
+					SVC_Topics::TAXONOMY
+				);
+			}
+
+			// Cap sideloads per run: each one is a download plus image
+			// resizing, and a new showcase would otherwise do them all in one
+			// worker-hogging request. Videos over the cap keep their unchanged
+			// _vimeo_thumbnail_src and are picked up on subsequent runs.
+			$max_sideloads = (int) apply_filters( 'svc_max_thumbnail_sideloads', 10 );
+
+			if ( $thumbnail && $thumbnails < $max_sideloads && get_post_meta( $post_id, '_vimeo_thumbnail_src', true ) !== $thumbnail ) {
 				$attachment_id = self::sideload_thumbnail( $thumbnail, $post_id, $title, $vimeo_id );
 				if ( $attachment_id ) {
 					set_post_thumbnail( $post_id, $attachment_id );
@@ -200,12 +283,13 @@ class SVC_Sync {
 				'status'  => 'ok',
 				'message' => sprintf(
 					/* translators: 1: total videos, 2: created, 3: updated, 4: unpublished, 5: locked */
-					__( '%1$d videos in showcase: %2$d created, %3$d updated, %4$d unpublished, %5$d locked.', 'parish-video-center' ),
-					count( $videos ),
+					__( '%1$d videos across %6$d showcase(s): %2$d created, %3$d updated, %4$d unpublished, %5$d locked.', 'parish-video-center' ),
+					count( $videos_by_id ),
 					$created,
 					$updated,
 					$drafted,
-					$locked
+					$locked,
+					count( $topics )
 				),
 			),
 			false
@@ -291,7 +375,9 @@ class SVC_Sync {
 		require_once ABSPATH . 'wp-admin/includes/media.php';
 		require_once ABSPATH . 'wp-admin/includes/image.php';
 
-		$tmp = download_url( $url );
+		// 30s cap — the default is 300s, which would hold a PHP worker for
+		// five minutes per stalled CDN connection.
+		$tmp = download_url( $url, 30 );
 		if ( is_wp_error( $tmp ) ) {
 			return 0;
 		}

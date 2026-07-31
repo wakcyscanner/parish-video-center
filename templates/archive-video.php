@@ -25,6 +25,11 @@ $svc_settings = svc_get_settings();
 $svc_singular = '' !== trim( $svc_settings['singular'] ) ? $svc_settings['singular'] : 'Video';
 $svc_plural   = '' !== trim( $svc_settings['plural'] ) ? $svc_settings['plural'] : 'Videos';
 
+// Serves both the /video/ archive and topic landing pages; on a topic page
+// the main query is already scoped to the term.
+$svc_topic  = is_tax( SVC_Topics::TAXONOMY ) ? get_queried_object() : null;
+$svc_browse = $svc_topic ? $svc_topic->name : $svc_plural;
+
 $svc_all_posts = $GLOBALS['wp_query']->posts;
 $svc_hero      = null;
 $svc_upnext    = array();
@@ -42,7 +47,15 @@ if ( ! is_paged() && $svc_all_posts ) {
 
 			<?php if ( ! $svc_theme_banner ) : ?>
 				<header class="svc-archive-header">
-					<h1 class="svc-archive-title"><?php post_type_archive_title(); ?></h1>
+					<h1 class="svc-archive-title">
+						<?php
+						if ( $svc_topic ) {
+							echo esc_html( $svc_topic->name );
+						} else {
+							post_type_archive_title();
+						}
+						?>
+					</h1>
 				</header>
 			<?php endif; ?>
 
@@ -99,15 +112,18 @@ if ( ! is_paged() && $svc_all_posts ) {
 					</section>
 				<?php endif; ?>
 
+				<?php if ( $svc_hero && $svc_grid ) : ?>
+					<h2 class="svc-section-title">
+						<?php
+						/* translators: %s: topic name or plural video label */
+						echo esc_html( sprintf( __( 'Browse all %s', 'parish-video-center' ), $svc_browse ) );
+						?>
+					</h2>
+				<?php endif; ?>
+
+				<?php svc_render_topic_tabs( $svc_topic ? $svc_topic->term_id : 0 ); ?>
+
 				<?php if ( $svc_grid ) : ?>
-					<?php if ( $svc_hero ) : ?>
-						<h2 class="svc-section-title">
-							<?php
-							/* translators: %s: plural video label */
-							echo esc_html( sprintf( __( 'Browse all %s', 'parish-video-center' ), $svc_plural ) );
-							?>
-						</h2>
-					<?php endif; ?>
 					<div class="svc-gallery">
 						<?php foreach ( $svc_grid as $svc_grid_post ) : ?>
 							<?php svc_render_tile( $svc_grid_post ); ?>

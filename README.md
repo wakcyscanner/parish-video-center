@@ -7,10 +7,11 @@ Videos become real WordPress posts (a custom post type), so they get permalinks,
 ## Features
 
 - **Automatic sync** on a WP-Cron schedule (hourly, twice daily, daily, or weekly), plus a manual *Sync Now* button and a *Test Connection* check.
-- **Your vocabulary** — call them Homilies, Sermons, or Messages: the post labels and the archive URL slug are settings.
-- **Video-hub landing page** — a split hero features the latest video (player beside a "Latest" badge, short excerpt, and an "Up Next" list), followed by a "Browse all" thumbnail grid with duration badges and pagination; clean single-video pages. A theme can override either template (`archive-svc_video.php` / `single-svc_video.php`).
+- **Your vocabulary** — call them Homilies, Sermons, or Messages: the post labels are settings.
+- **Topics** — organize videos into topics (a homily series, a parish mission, any subject), each with its own root-level landing page (`/homilies/`, `/parish-mission/`, …). A topic with a Vimeo Showcase ID syncs automatically; one without is curated by hand on the video edit screens. Other topics show as tab links above each landing page's grid. Single videos all live under `/video/<slug>/` — the URL pattern search engines associate with watch pages.
+- **Video-hub landing pages** — a split hero features the latest video (player beside a "Latest" badge, short excerpt, and an "Up Next" list), followed by a "Browse all" thumbnail grid with duration badges and pagination; clean single-video pages. A theme can override the templates (`archive-svc_video.php` / `taxonomy-svc_topic.php` / `single-svc_video.php`).
 - **Recirculation** — every single video page ends with a thumbnail grid of other recent videos and a link to the full gallery (count is a setting, 0 hides it; also filterable via `svc_related_count`).
-- **Embed anywhere** — the "Parish Videos" block (live preview, grid or slider layout) or the `[parish_videos count="6" layout="slider" title="Recent Homilies"]` shortcode drops recent videos onto any page, e.g. the homepage. The slider is dependency-free scroll-snap with arrow buttons.
+- **Embed anywhere** — the "Parish Videos" block (live preview, grid or slider layout) or the `[parish_videos count="6" layout="slider" title="Recent Homilies" topic="homilies"]` shortcode drops recent videos onto any page, e.g. the homepage. The slider is dependency-free scroll-snap with arrow buttons.
 - **Embed even where WordPress can't reach** — `/video-embed/?layout=slider&count=8` serves the collection standalone (no theme chrome, links open the top window, height reported via postMessage) for iframes, locked homepage templates, edge workers, or entirely different sites.
 - **Click-to-play facade** — pages load only a poster image; the Vimeo iframe is injected on click (`dnt=1` set on the player), so no third-party requests until the visitor opts in.
 - **Safe sync semantics** — videos removed from the showcase are unpublished (drafted), never deleted, and re-publish if they return. A per-video *"Don't overwrite with Vimeo data"* lock protects manual edits.
@@ -24,10 +25,10 @@ Videos become real WordPress posts (a custom post type), so they get permalinks,
 1. Grab `parish-video-center.zip` from the [latest release](../../releases/latest) and install it via **Plugins → Add New → Upload Plugin**.
 2. Create a personal access token at [developer.vimeo.com/apps](https://developer.vimeo.com/apps) with the **public** and **private** scopes, on the Vimeo account that owns the showcase.
 3. Find your showcase ID — the number in the showcase URL: `vimeo.com/showcase/1234567` → `1234567`.
-4. In wp-admin, open the video post type menu → **Settings**, enter the token and showcase ID, and click **Test Connection**.
-5. Pick your labels (e.g. *Homily / Homilies*) and archive slug (e.g. `homilies`), save, then click **Sync Now**.
+4. In wp-admin, open the video post type menu → **Settings**, enter the token, and pick your labels (e.g. *Homily / Homilies*).
+5. Under the video post type menu → **Topics**, add a topic (e.g. *Homilies*, slug `homilies`) with your showcase ID, then back in Settings click **Test Connection** and **Sync Now**.
 
-Your gallery appears at `yoursite.org/<your-slug>/`.
+Each topic's landing page appears at `yoursite.org/<topic-slug>/`; single videos live at `yoursite.org/video/<slug>/`.
 
 > **Tip:** instead of storing the token in the database, define it in `wp-config.php` — `define( 'VIMEO_TOKEN', '…' );` — which overrides the settings field.
 

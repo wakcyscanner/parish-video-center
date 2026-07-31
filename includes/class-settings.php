@@ -130,6 +130,8 @@ class SVC_Settings {
 			$flag = sanitize_key( wp_unslash( $_GET['svc-synced'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 			if ( 'ok' === $flag ) {
 				echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Sync completed.', 'parish-video-center' ) . '</p></div>';
+			} elseif ( 'locked' === $flag ) {
+				echo '<div class="notice notice-warning is-dismissible"><p>' . esc_html__( 'A sync is already running — try again in a few minutes.', 'parish-video-center' ) . '</p></div>';
 			} else {
 				echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__( 'Sync failed — see the last sync status below.', 'parish-video-center' ) . '</p></div>';
 			}
@@ -159,32 +161,41 @@ class SVC_Settings {
 		}
 		check_admin_referer( 'svc_test_connection' );
 
+		// Test every showcase-backed topic; legacy single-showcase config as fallback.
 		$settings = svc_get_settings();
-		$result   = SVC_Vimeo_API::test_connection( $settings['showcase_id'] );
-
-		if ( is_wp_error( $result ) ) {
-			set_transient(
-				'svc_test_result',
+		$topics   = SVC_Topics::synced_topics();
+		if ( ! $topics ) {
+			$topics = array(
 				array(
-					'status'  => 'error',
-					'message' => $result->get_error_message(),
+					'term_id'     => 0,
+					'showcase_id' => $settings['showcase_id'],
+					'name'        => __( 'Showcase', 'parish-video-center' ),
 				),
-				5 * MINUTE_IN_SECONDS
-			);
-		} else {
-			set_transient(
-				'svc_test_result',
-				array(
-					'status'  => 'ok',
-					'message' => sprintf(
-						/* translators: %d: number of videos */
-						__( 'Connection OK — the showcase contains %d videos.', 'parish-video-center' ),
-						$result
-					),
-				),
-				5 * MINUTE_IN_SECONDS
 			);
 		}
+
+		$parts  = array();
+		$status = 'ok';
+
+		foreach ( $topics as $topic ) {
+			$result = SVC_Vimeo_API::test_connection( $topic['showcase_id'] );
+			if ( is_wp_error( $result ) ) {
+				$status  = 'error';
+				$parts[] = sprintf( '%s: %s', $topic['name'], $result->get_error_message() );
+			} else {
+				/* translators: 1: topic name, 2: number of videos */
+				$parts[] = sprintf( __( '%1$s: %2$d videos', 'parish-video-center' ), $topic['name'], $result );
+			}
+		}
+
+		set_transient(
+			'svc_test_result',
+			array(
+				'status'  => $status,
+				'message' => ( 'ok' === $status ? __( 'Connection OK — ', 'parish-video-center' ) : '' ) . implode( '; ', $parts ) . '.',
+			),
+			5 * MINUTE_IN_SECONDS
+		);
 
 		wp_safe_redirect( add_query_arg( 'svc-tested', '1', self::url() ) );
 		exit;
@@ -227,10 +238,12 @@ class SVC_Settings {
 						</td>
 					</tr>
 					<tr>
-						<th scope="row"><label for="svc-showcase"><?php esc_html_e( 'Showcase ID', 'parish-video-center' ); ?></label></th>
+						<th scope="row"><?php esc_html_e( 'Showcases', 'parish-video-center' ); ?></th>
 						<td>
-							<input type="text" id="svc-showcase" name="svc_settings[showcase_id]" value="<?php echo esc_attr( $settings['showcase_id'] ); ?>" class="regular-text" inputmode="numeric">
-							<p class="description"><?php esc_html_e( 'The number in the showcase URL, e.g. vimeo.com/showcase/1234567 → 1234567.', 'parish-video-center' ); ?></p>
+							<p class="description">
+								<?php esc_html_e( 'Showcases are configured per topic: each topic with a Vimeo Showcase ID syncs automatically and gets its own landing page.', 'parish-video-center' ); ?>
+								<a href="<?php echo esc_url( admin_url( 'edit-tags.php?taxonomy=' . SVC_Topics::TAXONOMY . '&post_type=' . SVC_Post_Type::POST_TYPE ) ); ?>"><?php esc_html_e( 'Manage Topics', 'parish-video-center' ); ?></a>
+							</p>
 						</td>
 					</tr>
 				</table>
@@ -249,15 +262,15 @@ class SVC_Settings {
 						<td><input type="text" id="svc-plural" name="svc_settings[plural]" value="<?php echo esc_attr( $settings['plural'] ); ?>" class="regular-text"></td>
 					</tr>
 					<tr>
-						<th scope="row"><label for="svc-slug"><?php esc_html_e( 'Archive URL Slug', 'parish-video-center' ); ?></label></th>
+						<th scope="row"><?php esc_html_e( 'URLs', 'parish-video-center' ); ?></th>
 						<td>
-							<input type="text" id="svc-slug" name="svc_settings[slug]" value="<?php echo esc_attr( $settings['slug'] ); ?>" class="regular-text">
 							<p class="description">
 								<?php
 								printf(
-									/* translators: %s: example archive URL */
-									esc_html__( 'The gallery page lives at %s.', 'parish-video-center' ),
-									'<code>' . esc_html( home_url( '/' . ( $settings['slug'] ? $settings['slug'] : 'videos' ) . '/' ) ) . '</code>'
+									/* translators: 1: single video URL pattern, 2: topic URL pattern */
+									esc_html__( 'Single videos live at %1$s; each topic\'s landing page lives at %2$s.', 'parish-video-center' ),
+									'<code>' . esc_html( home_url( '/video/…/' ) ) . '</code>',
+									'<code>' . esc_html( home_url( '/<topic-slug>/' ) ) . '</code>'
 								);
 								?>
 							</p>

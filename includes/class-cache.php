@@ -24,7 +24,8 @@ class SVC_Cache {
 	 */
 	public static function maybe_purge_on_upgrade() {
 		if ( get_option( 'svc_version' ) !== SVC_VERSION ) {
-			update_option( 'svc_version', SVC_VERSION, false );
+			// Autoloaded: read on every request by this check.
+			update_option( 'svc_version', SVC_VERSION, true );
 			// New versions may register new rewrite rules (e.g. the video
 			// sitemap); rules are registered by now, so flushing is safe here.
 			flush_rewrite_rules();
