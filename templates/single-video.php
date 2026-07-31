@@ -56,10 +56,24 @@ while ( have_posts() ) :
 							</button>
 						</p>
 					<?php endif; ?>
+					<?php
+					// Back link goes to the video's topic landing page; the
+					// all-videos archive only when the video has no topic.
+					$svc_back_url   = get_post_type_archive_link( SVC_Post_Type::POST_TYPE );
+					$svc_back_label = $svc_settings['plural'];
+					$svc_back_terms = get_the_terms( get_the_ID(), SVC_Topics::TAXONOMY );
+					if ( $svc_back_terms && ! is_wp_error( $svc_back_terms ) ) {
+						$svc_back_term_url = get_term_link( $svc_back_terms[0] );
+						if ( ! is_wp_error( $svc_back_term_url ) ) {
+							$svc_back_url   = $svc_back_term_url;
+							$svc_back_label = $svc_back_terms[0]->name;
+						}
+					}
+					?>
 					<p class="svc-back">
-						<a href="<?php echo esc_url( get_post_type_archive_link( SVC_Post_Type::POST_TYPE ) ); ?>">&larr; <?php
-							/* translators: %s: plural video label */
-							echo esc_html( sprintf( __( 'All %s', 'parish-video-center' ), $svc_settings['plural'] ) );
+						<a href="<?php echo esc_url( $svc_back_url ); ?>">&larr; <?php
+							/* translators: %s: topic name or plural video label */
+							echo esc_html( sprintf( __( 'All %s', 'parish-video-center' ), $svc_back_label ) );
 						?></a>
 					</p>
 				</div>
