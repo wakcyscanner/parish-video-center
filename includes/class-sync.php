@@ -11,6 +11,7 @@ class SVC_Sync {
 
 	const CRON_HOOK   = 'svc_sync_event';
 	const FREQUENCIES = array( 'hourly', 'twicedaily', 'daily', 'weekly' );
+	const LOCK        = 'svc_sync_running';
 
 	public static function init() {
 		add_action( self::CRON_HOOK, array( __CLASS__, 'run' ) );
@@ -44,7 +45,10 @@ class SVC_Sync {
 		check_admin_referer( 'svc_sync_now' );
 
 		$result = self::run();
-		$flag   = is_wp_error( $result ) ? 'error' : 'ok';
+		$flag   = 'ok';
+		if ( is_wp_error( $result ) ) {
+			$flag = 'svc_sync_running' === $result->get_error_code() ? 'locked' : 'error';
+		}
 
 		wp_safe_redirect( add_query_arg( 'svc-synced', $flag, SVC_Settings::url() ) );
 		exit;
@@ -53,9 +57,33 @@ class SVC_Sync {
 	/**
 	 * Run a full sync: upsert posts, sideload changed thumbnails, draft removed videos.
 	 *
+	 * A run can hold a PHP worker for a while (Vimeo API paging across every
+	 * topic's showcase, thumbnail downloads and resizing), so overlapping runs
+	 * — hourly cron colliding with a manual Sync Now, or slow runs stacking up
+	 * — are refused via a lock. The lock expires on its own so a fatally
+	 * interrupted run can't wedge syncing for good.
+	 *
 	 * @return true|WP_Error
 	 */
 	public static function run() {
+		if ( get_transient( self::LOCK ) ) {
+			return new WP_Error( 'svc_sync_running', __( 'A sync is already running — skipped this one.', 'parish-video-center' ) );
+		}
+		set_transient( self::LOCK, time(), 10 * MINUTE_IN_SECONDS );
+
+		$result = self::run_unlocked();
+
+		delete_transient( self::LOCK );
+
+		return $result;
+	}
+
+	/**
+	 * The sync itself; callers must hold the lock (see run()).
+	 *
+	 * @return true|WP_Error
+	 */
+	private static function run_unlocked() {
 		$settings = svc_get_settings();
 
 		// Showcase-backed topics drive the sync; a site not yet using topics
@@ -217,7 +245,13 @@ class SVC_Sync {
 				);
 			}
 
-			if ( $thumbnail && get_post_meta( $post_id, '_vimeo_thumbnail_src', true ) !== $thumbnail ) {
+			// Cap sideloads per run: each one is a download plus image
+			// resizing, and a new showcase would otherwise do them all in one
+			// worker-hogging request. Videos over the cap keep their unchanged
+			// _vimeo_thumbnail_src and are picked up on subsequent runs.
+			$max_sideloads = (int) apply_filters( 'svc_max_thumbnail_sideloads', 10 );
+
+			if ( $thumbnail && $thumbnails < $max_sideloads && get_post_meta( $post_id, '_vimeo_thumbnail_src', true ) !== $thumbnail ) {
 				$attachment_id = self::sideload_thumbnail( $thumbnail, $post_id, $title, $vimeo_id );
 				if ( $attachment_id ) {
 					set_post_thumbnail( $post_id, $attachment_id );
@@ -341,7 +375,9 @@ class SVC_Sync {
 		require_once ABSPATH . 'wp-admin/includes/media.php';
 		require_once ABSPATH . 'wp-admin/includes/image.php';
 
-		$tmp = download_url( $url );
+		// 30s cap — the default is 300s, which would hold a PHP worker for
+		// five minutes per stalled CDN connection.
+		$tmp = download_url( $url, 30 );
 		if ( is_wp_error( $tmp ) ) {
 			return 0;
 		}

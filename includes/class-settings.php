@@ -130,6 +130,8 @@ class SVC_Settings {
 			$flag = sanitize_key( wp_unslash( $_GET['svc-synced'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 			if ( 'ok' === $flag ) {
 				echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Sync completed.', 'parish-video-center' ) . '</p></div>';
+			} elseif ( 'locked' === $flag ) {
+				echo '<div class="notice notice-warning is-dismissible"><p>' . esc_html__( 'A sync is already running — try again in a few minutes.', 'parish-video-center' ) . '</p></div>';
 			} else {
 				echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__( 'Sync failed — see the last sync status below.', 'parish-video-center' ) . '</p></div>';
 			}

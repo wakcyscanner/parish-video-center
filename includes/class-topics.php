@@ -73,7 +73,8 @@ class SVC_Topics {
 		if ( get_option( 'svc_topics_migrated' ) ) {
 			return;
 		}
-		update_option( 'svc_topics_migrated', 1, false );
+		// Autoloaded: read on every request by the check above.
+		update_option( 'svc_topics_migrated', 1, true );
 
 		$settings = svc_get_settings();
 		if ( ! $settings['showcase_id'] || get_terms( array( 'taxonomy' => self::TAXONOMY, 'hide_empty' => false, 'number' => 1, 'fields' => 'ids' ) ) ) {
