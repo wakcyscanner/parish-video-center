@@ -65,10 +65,6 @@ class SVC_Post_Type {
 
 		$singular = '' !== trim( $settings['singular'] ) ? $settings['singular'] : 'Video';
 		$plural   = '' !== trim( $settings['plural'] ) ? $settings['plural'] : 'Videos';
-		$slug     = sanitize_title( $settings['slug'] );
-		if ( '' === $slug ) {
-			$slug = 'videos';
-		}
 
 		register_post_type(
 			self::POST_TYPE,
@@ -90,11 +86,14 @@ class SVC_Post_Type {
 					/* translators: %s: plural video label */
 					'all_items'     => sprintf( __( 'All %s', 'parish-video-center' ), $plural ),
 				),
-				'description'  => __( 'Videos synced from a Vimeo showcase.', 'parish-video-center' ),
+				'description'  => __( 'Videos synced from Vimeo showcases.', 'parish-video-center' ),
 				'public'       => true,
-				'has_archive'  => $slug,
+				// Fixed /video/ base: single videos are watch pages, and the
+				// /video/<slug>/ pattern is itself a signal Google associates
+				// with them. Topic landing pages own the friendly root slugs.
+				'has_archive'  => 'video',
 				'rewrite'      => array(
-					'slug'       => $slug,
+					'slug'       => 'video',
 					'with_front' => false,
 				),
 				'menu_icon'    => 'dashicons-video-alt3',

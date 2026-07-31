@@ -54,6 +54,7 @@ class SVC_Embeds {
 				'count'  => 6,
 				'layout' => 'grid',
 				'title'  => '',
+				'topic'  => '',
 			),
 			$atts,
 			'parish_videos'
@@ -70,6 +71,7 @@ class SVC_Embeds {
 					'count'  => 6,
 					'layout' => 'grid',
 					'title'  => '',
+					'topic'  => '',
 				)
 			)
 		);
@@ -91,6 +93,7 @@ class SVC_Embeds {
 			'count'  => isset( $_GET['count'] ) ? (int) $_GET['count'] : 8,
 			'layout' => isset( $_GET['layout'] ) ? sanitize_key( wp_unslash( $_GET['layout'] ) ) : 'slider',
 			'title'  => isset( $_GET['title'] ) ? sanitize_text_field( wp_unslash( $_GET['title'] ) ) : '',
+			'topic'  => isset( $_GET['topic'] ) ? sanitize_title( wp_unslash( $_GET['topic'] ) ) : '',
 		);
 		// phpcs:enable
 
@@ -133,23 +136,33 @@ class SVC_Embeds {
 	/**
 	 * Render a collection of recent videos.
 	 *
-	 * @param array $args count, layout (grid|slider), title.
+	 * @param array $args count, layout (grid|slider), title, topic (term slug, '' = all).
 	 * @return string HTML, or '' when no videos exist.
 	 */
 	private static function render( $args ) {
 		$count  = min( 24, max( 1, (int) $args['count'] ) );
 		$layout = 'slider' === $args['layout'] ? 'slider' : 'grid';
 		$title  = sanitize_text_field( (string) $args['title'] );
+		$topic  = isset( $args['topic'] ) ? sanitize_title( (string) $args['topic'] ) : '';
 
-		$posts = get_posts(
-			array(
-				'post_type'      => SVC_Post_Type::POST_TYPE,
-				'post_status'    => 'publish',
-				'posts_per_page' => $count,
-				'orderby'        => 'date',
-				'order'          => 'DESC',
-			)
+		$query_args = array(
+			'post_type'      => SVC_Post_Type::POST_TYPE,
+			'post_status'    => 'publish',
+			'posts_per_page' => $count,
+			'orderby'        => 'date',
+			'order'          => 'DESC',
 		);
+		if ( '' !== $topic ) {
+			$query_args['tax_query'] = array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_tax_query
+				array(
+					'taxonomy' => SVC_Topics::TAXONOMY,
+					'field'    => 'slug',
+					'terms'    => $topic,
+				),
+			);
+		}
+
+		$posts = get_posts( $query_args );
 
 		if ( ! $posts ) {
 			return '';

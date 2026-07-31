@@ -16,7 +16,7 @@ class SVC_Structured_Data {
 	public static function output() {
 		if ( is_singular( SVC_Post_Type::POST_TYPE ) ) {
 			self::video_object();
-		} elseif ( is_post_type_archive( SVC_Post_Type::POST_TYPE ) ) {
+		} elseif ( is_post_type_archive( SVC_Post_Type::POST_TYPE ) || is_tax( SVC_Topics::TAXONOMY ) ) {
 			self::item_list();
 		}
 	}

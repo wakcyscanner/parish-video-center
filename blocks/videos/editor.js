@@ -49,6 +49,12 @@
 								{ label: __('Slider', 'parish-video-center'), value: 'slider' }
 							],
 							onChange: function (value) { props.setAttributes({ layout: value }); }
+						}),
+						el(TextControl, {
+							label: __('Topic', 'parish-video-center'),
+							help: __('Topic slug to show videos from. Leave empty for all topics.', 'parish-video-center'),
+							value: attributes.topic,
+							onChange: function (value) { props.setAttributes({ topic: value }); }
 						})
 					)
 				),

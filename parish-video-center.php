@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Parish Video Center
  * Description: Syncs a Vimeo showcase into WordPress video posts with a gallery archive, single video pages, and VideoObject structured data. Post labels and URL slug are configurable (Homilies, Sermons, Messages, …).
- * Version: 1.12.0
+ * Version: 1.13.0-beta.1
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Author: St. Paul the Apostle Catholic Church
@@ -15,12 +15,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'SVC_VERSION', '1.12.0' );
+define( 'SVC_VERSION', '1.13.0-beta.1' );
 define( 'SVC_PLUGIN_FILE', __FILE__ );
 define( 'SVC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SVC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
 require_once SVC_PLUGIN_DIR . 'includes/class-post-type.php';
+require_once SVC_PLUGIN_DIR . 'includes/class-topics.php';
 require_once SVC_PLUGIN_DIR . 'includes/class-vimeo-api.php';
 require_once SVC_PLUGIN_DIR . 'includes/class-sync.php';
 require_once SVC_PLUGIN_DIR . 'includes/class-settings.php';
@@ -34,6 +35,7 @@ require_once SVC_PLUGIN_DIR . 'includes/class-embeds.php';
 require_once SVC_PLUGIN_DIR . 'includes/class-rest.php';
 
 SVC_Post_Type::init();
+SVC_Topics::init();
 SVC_Sync::init();
 SVC_Settings::init();
 SVC_Structured_Data::init();
@@ -263,6 +265,37 @@ function svc_render_tile( $tile_post ) {
 }
 
 /**
+ * Render the topic tab bar shown above the browse grid: the current topic
+ * plus every other topic as links to their landing pages. Rendered only when
+ * there is somewhere else to go.
+ *
+ * @param int $current_id Term ID of the topic being viewed; 0 on /video/.
+ */
+function svc_render_topic_tabs( $current_id = 0 ) {
+	$topics = array_filter(
+		SVC_Topics::all_topics(),
+		function ( $topic ) use ( $current_id ) {
+			return $topic->count > 0 || (int) $topic->term_id === (int) $current_id;
+		}
+	);
+
+	if ( count( $topics ) < 2 ) {
+		return;
+	}
+
+	?>
+	<nav class="svc-tabs" aria-label="<?php esc_attr_e( 'Video topics', 'parish-video-center' ); ?>">
+		<?php foreach ( $topics as $tab_topic ) : ?>
+			<?php $svc_tab_current = (int) $tab_topic->term_id === (int) $current_id; ?>
+			<a class="svc-tab<?php echo $svc_tab_current ? ' svc-tab-current' : ''; ?>"
+				href="<?php echo esc_url( get_term_link( $tab_topic ) ); ?>"
+				<?php echo $svc_tab_current ? 'aria-current="page"' : ''; ?>><?php echo esc_html( $tab_topic->name ); ?></a>
+		<?php endforeach; ?>
+	</nav>
+	<?php
+}
+
+/**
  * Render the recirculation module: a grid of other recent videos with
  * thumbnail tiles, shown at the bottom of single video pages. The count
  * comes from the "Related Videos" setting unless passed explicitly, and is
@@ -280,23 +313,41 @@ function svc_render_related( $post_id, $count = null ) {
 		return;
 	}
 
-	$related = get_posts(
-		array(
-			'post_type'      => SVC_Post_Type::POST_TYPE,
-			'post_status'    => 'publish',
-			'posts_per_page' => $count,
-			'post__not_in'   => array( (int) $post_id ),
-			'no_found_rows'  => true,
-		)
+	// Scope to the video's first topic so the rail stays on-subject; the
+	// heading and "view all" link follow it.
+	$topic       = null;
+	$post_topics = get_the_terms( $post_id, SVC_Topics::TAXONOMY );
+	if ( $post_topics && ! is_wp_error( $post_topics ) ) {
+		$topic = $post_topics[0];
+	}
+
+	$query_args = array(
+		'post_type'      => SVC_Post_Type::POST_TYPE,
+		'post_status'    => 'publish',
+		'posts_per_page' => $count,
+		'post__not_in'   => array( (int) $post_id ),
+		'no_found_rows'  => true,
 	);
+	if ( $topic ) {
+		$query_args['tax_query'] = array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_tax_query
+			array(
+				'taxonomy' => SVC_Topics::TAXONOMY,
+				'terms'    => (int) $topic->term_id,
+			),
+		);
+	}
+
+	$related = get_posts( $query_args );
 
 	if ( ! $related ) {
 		return;
 	}
 
 	$plural = '' !== trim( $settings['plural'] ) ? $settings['plural'] : 'Videos';
-	/* translators: %s: plural video label */
-	$heading = sprintf( __( 'More %s', 'parish-video-center' ), $plural );
+	$label  = $topic ? $topic->name : $plural;
+	/* translators: %s: topic name or plural video label */
+	$heading = sprintf( __( 'More %s', 'parish-video-center' ), $label );
+	$all_url = $topic ? get_term_link( $topic ) : get_post_type_archive_link( SVC_Post_Type::POST_TYPE );
 	?>
 	<aside class="svc-related" aria-label="<?php echo esc_attr( $heading ); ?>">
 		<h2 class="svc-related-title"><?php echo esc_html( $heading ); ?></h2>
@@ -306,9 +357,9 @@ function svc_render_related( $post_id, $count = null ) {
 			<?php endforeach; ?>
 		</div>
 		<p class="svc-related-all">
-			<a href="<?php echo esc_url( get_post_type_archive_link( SVC_Post_Type::POST_TYPE ) ); ?>"><?php
-				/* translators: %s: plural video label */
-				echo esc_html( sprintf( __( 'View all %s', 'parish-video-center' ), $plural ) );
+			<a href="<?php echo esc_url( $all_url ); ?>"><?php
+				/* translators: %s: topic name or plural video label */
+				echo esc_html( sprintf( __( 'View all %s', 'parish-video-center' ), $label ) );
 			?> &rarr;</a>
 		</p>
 	</aside>
@@ -436,11 +487,19 @@ add_filter( 'template_include', function ( $template ) {
 		return $theme_template ? $theme_template : SVC_PLUGIN_DIR . 'templates/archive-video.php';
 	}
 
+	// Topic landing pages share the archive layout (scoped by the main query).
+	if ( is_tax( SVC_Topics::TAXONOMY ) ) {
+		$theme_template = locate_template( 'taxonomy-' . SVC_Topics::TAXONOMY . '.php' );
+		return $theme_template ? $theme_template : SVC_PLUGIN_DIR . 'templates/archive-video.php';
+	}
+
 	return $template;
 } );
 
 add_action( 'wp_enqueue_scripts', function () {
-	if ( ! is_singular( SVC_Post_Type::POST_TYPE ) && ! is_post_type_archive( SVC_Post_Type::POST_TYPE ) ) {
+	if ( ! is_singular( SVC_Post_Type::POST_TYPE )
+		&& ! is_post_type_archive( SVC_Post_Type::POST_TYPE )
+		&& ! is_tax( SVC_Topics::TAXONOMY ) ) {
 		return;
 	}
 
@@ -468,14 +527,18 @@ add_action( 'wp_head', function () {
 	}
 }, 3 );
 
-// Apply the configured per-page count to the archive.
+// Apply the configured per-page count to the archive and topic landing pages.
 add_action( 'pre_get_posts', function ( $query ) {
 	if ( is_admin() || ! $query->is_main_query() ) {
 		return;
 	}
 
-	if ( $query->is_post_type_archive( SVC_Post_Type::POST_TYPE ) ) {
+	if ( $query->is_post_type_archive( SVC_Post_Type::POST_TYPE ) || $query->is_tax( SVC_Topics::TAXONOMY ) ) {
 		$settings = svc_get_settings();
 		$query->set( 'posts_per_page', max( 1, (int) $settings['per_page'] ) );
+	}
+
+	if ( $query->is_tax( SVC_Topics::TAXONOMY ) ) {
+		$query->set( 'post_type', SVC_Post_Type::POST_TYPE );
 	}
 } );

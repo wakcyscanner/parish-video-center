@@ -72,6 +72,12 @@ Plugin options and scheduled events are removed. Video posts and sideloaded medi
 
 == Changelog ==
 
+= 1.13.0 =
+* Topics: videos are now organized into topics (Videos → Topics), each with its own root-level landing page (/homilies/, /parish-mission/, …) using the split-hero hub layout. A topic with a Vimeo Showcase ID syncs automatically; a topic without one is curated by hand from the video edit screens. The other topics appear as tab links above the browse grid. Existing sites are migrated automatically: the configured showcase becomes the first topic, keeping its landing page URL.
+* All single videos now live under /video/<slug>/ — the URL pattern search engines associate with watch pages — regardless of topic. Set up 301 redirects from the old single-video URLs (e.g. with the Redirection plugin); topic landing page URLs are unchanged.
+* The [parish_videos] shortcode, the Parish Videos block, and the /video-embed/ endpoint accept a topic="slug" parameter to show a single topic's videos.
+* The single-page recirculation grid is scoped to the video's topic, and "Test Connection" now checks every topic's showcase.
+
 = 1.12.0 =
 * Single video pages now serve only the first line of the description; the remainder is fetched over a REST endpoint when a visitor clicks "Read more", and is otherwise absent from the page HTML entirely. This makes the served page read as "player plus caption" rather than an article with an embedded video — Google kept classifying the full-text pages' videos as supplementary content. Write descriptions so their first line stands alone as an excerpt. The full description still feeds the VideoObject JSON-LD, social meta, and the video sitemap.
 

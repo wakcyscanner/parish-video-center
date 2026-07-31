@@ -12,6 +12,7 @@ delete_option( 'svc_settings' );
 delete_option( 'svc_last_sync' );
 delete_option( 'svc_flush_rewrite' );
 delete_option( 'svc_version' );
+delete_option( 'svc_topics_migrated' );
 delete_transient( 'svc_test_result' );
 delete_transient( 'svc_update_check' );
 delete_transient( 'svc_update_check_stable' );
