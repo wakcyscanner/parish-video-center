@@ -59,16 +59,16 @@ class SVC_Sitemap {
 		echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">' . "\n";
 
 		foreach ( $posts as $post ) {
-			$vimeo_id = get_post_meta( $post->ID, '_vimeo_id', true );
-			if ( ! $vimeo_id ) {
+			$player_loc = SVC_Video::embed_url( $post->ID );
+			if ( ! $player_loc ) {
 				continue;
 			}
 
-			// Google requires a thumbnail; fall back to the Vimeo CDN URL if
+			// Google requires a thumbnail; fall back to the provider's CDN URL if
 			// the sideloaded featured image is missing.
 			$thumbnail = get_the_post_thumbnail_url( $post, 'full' );
 			if ( ! $thumbnail ) {
-				$thumbnail = get_post_meta( $post->ID, '_vimeo_thumbnail_src', true );
+				$thumbnail = SVC_Video::thumbnail_src( $post->ID );
 			}
 			if ( ! $thumbnail ) {
 				continue;
@@ -78,7 +78,7 @@ class SVC_Sitemap {
 			$description = '' !== trim( (string) $post->post_content )
 				? wp_trim_words( wp_strip_all_tags( $post->post_content ), 50 )
 				: $title;
-			$duration    = (int) get_post_meta( $post->ID, '_vimeo_duration', true );
+			$duration    = SVC_Video::duration( $post->ID );
 
 			echo "\t<url>\n";
 			echo "\t\t<loc>" . esc_url( get_permalink( $post ) ) . "</loc>\n";
@@ -87,12 +87,12 @@ class SVC_Sitemap {
 			echo "\t\t\t<video:title>" . esc_xml( $title ) . "</video:title>\n";
 			echo "\t\t\t<video:description>" . esc_xml( $description ) . "</video:description>\n";
 			// content_loc must precede player_loc in the video sitemap schema.
-			$file_url = get_post_meta( $post->ID, '_vimeo_file_url', true );
+			$file_url = SVC_Video::file_url( $post->ID );
 			if ( $file_url ) {
 				echo "\t\t\t<video:content_loc>" . esc_url( $file_url ) . "</video:content_loc>\n";
 			}
-			// ?dnt=1 keeps this byte-identical to the iframe src and JSON-LD embedUrl.
-			echo "\t\t\t<video:player_loc>" . esc_url( 'https://player.vimeo.com/video/' . rawurlencode( $vimeo_id ) . '?dnt=1' ) . "</video:player_loc>\n";
+			// Byte-identical to the iframe src and JSON-LD embedUrl.
+			echo "\t\t\t<video:player_loc>" . esc_url( $player_loc ) . "</video:player_loc>\n";
 			if ( $duration > 0 && $duration <= 28800 ) {
 				echo "\t\t\t<video:duration>" . (int) $duration . "</video:duration>\n";
 			}

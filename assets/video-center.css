@@ -16,12 +16,35 @@
 .svc-player {
 	position: relative;
 	width: 100%;
-	aspect-ratio: 16 / 9;
+	aspect-ratio: var(--svc-ratio, 16 / 9);
 	background-color: #000;
 	border-radius: 8px;
 	overflow: hidden;
 	margin-bottom: 1.5rem;
 	cursor: pointer;
+}
+
+/* Tall (phone-shaped) videos: as large as fits on screen without scrolling,
+   centred, instead of a strip inside a wide box. --svc-ratio is the video's
+   own width / height, set inline. */
+.svc-player.svc-portrait {
+	width: min(100%, calc(82vh * var(--svc-ratio)));
+	width: min(100%, calc(82svh * var(--svc-ratio)));
+	margin-left: auto;
+	margin-right: auto;
+}
+
+/* On larger screens a tall video is held to a moderate size, so the title
+   and description stay on screen with it rather than below the fold. */
+@media (min-width: 783px) {
+	.svc-player.svc-portrait {
+		width: min(100%, calc(min(70vh, 640px) * var(--svc-ratio)));
+	}
+}
+
+/* A wide poster on a tall video is shown whole rather than cropped. */
+.svc-portrait .svc-poster {
+	object-fit: contain;
 }
 
 .svc-poster {
@@ -603,4 +626,29 @@
 	.svc-thumbnail {
 		break-inside: avoid;
 	}
+}
+
+/* Tall posters in the browse grid: shown whole on a dark tile */
+.svc-thumbnail--tall {
+	background-color: #111;
+}
+
+.svc-thumbnail--tall .svc-thumb-img {
+	object-fit: contain;
+}
+
+/* Single video embedded in a post or page ([parish_video] / Parish Video block) */
+
+.svc-embed-video {
+	margin: 0 0 1.5rem;
+}
+
+.svc-embed-video .svc-player {
+	margin-bottom: 0;
+}
+
+.svc-embed-caption {
+	margin-top: 0.5rem;
+	font-size: 0.95em;
+	text-align: center;
 }

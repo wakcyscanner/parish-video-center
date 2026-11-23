@@ -1,0 +1,24 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "parish-video-center/video",
+	"title": "Parish Video",
+	"category": "media",
+	"icon": "video-alt3",
+	"description": "A single video from the video center, with a click-to-play player.",
+	"keywords": [ "video", "homily", "sermon", "player", "embed" ],
+	"textdomain": "parish-video-center",
+	"attributes": {
+		"postId": { "type": "number", "default": 0 },
+		"videoId": { "type": "string", "default": "" },
+		"showTitle": { "type": "boolean", "default": false }
+	},
+	"supports": {
+		"html": false,
+		"align": [ "wide", "full" ]
+	},
+	"editorScript": "svc-video-editor",
+	"editorStyle": "svc-video-center",
+	"style": "svc-video-center",
+	"viewScript": "svc-player"
+}

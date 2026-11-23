@@ -77,7 +77,7 @@ if ( ! is_paged() && $svc_all_posts ) {
 							<div class="svc-meta">
 								<?php
 								echo esc_html( get_the_date( '', $svc_hero ) );
-								$svc_hero_duration = svc_human_duration( get_post_meta( $svc_hero->ID, '_vimeo_duration', true ) );
+								$svc_hero_duration = svc_human_duration( SVC_Video::duration( $svc_hero->ID ) );
 								if ( $svc_hero_duration ) {
 									echo ' &middot; ' . esc_html( $svc_hero_duration );
 								}
@@ -99,7 +99,7 @@ if ( ! is_paged() && $svc_all_posts ) {
 											</span>
 											<span class="svc-upnext-info">
 												<span class="svc-upnext-item-title"><?php echo esc_html( get_the_title( $svc_upnext_post ) ); ?></span>
-												<?php $svc_upnext_duration = svc_human_duration( get_post_meta( $svc_upnext_post->ID, '_vimeo_duration', true ) ); ?>
+												<?php $svc_upnext_duration = svc_human_duration( SVC_Video::duration( $svc_upnext_post->ID ) ); ?>
 												<?php if ( $svc_upnext_duration ) : ?>
 													<span class="svc-upnext-duration"><?php echo esc_html( $svc_upnext_duration ); ?></span>
 												<?php endif; ?>

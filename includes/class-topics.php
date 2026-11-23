@@ -1,8 +1,9 @@
 <?php
 /**
  * Topics: named collections of videos, each with its own root-level landing
- * page (/homilies/, /parish-mission/, …). A topic with a Vimeo Showcase ID is
- * synced automatically; a topic without one is curated by hand from the video
+ * page (/homilies/, /parish-mission/, …). A topic linked to a Vimeo showcase and/or
+ * a Bunny Stream collection is synced automatically; a topic with neither is
+ * curated by hand from the video
  * edit screen. Single videos all live under /video/<slug>/ regardless of topic.
  */
 
@@ -13,7 +14,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 class SVC_Topics {
 
 	const TAXONOMY      = 'svc_topic';
-	const SHOWCASE_META = 'svc_showcase_id';
+	const SHOWCASE_META   = 'svc_showcase_id';
+	const COLLECTION_META = 'svc_bunny_collection_id';
 
 	public static function init() {
 		add_action( 'init', array( __CLASS__, 'register' ), 10 );
@@ -27,7 +29,7 @@ class SVC_Topics {
 			add_action( $hook, array( __CLASS__, 'schedule_flush' ) );
 		}
 
-		// Showcase ID field on the term add/edit screens.
+		// Source fields (showcase, collection) on the term add/edit screens.
 		add_action( self::TAXONOMY . '_add_form_fields', array( __CLASS__, 'add_form_field' ) );
 		add_action( self::TAXONOMY . '_edit_form_fields', array( __CLASS__, 'edit_form_field' ) );
 		add_action( 'created_' . self::TAXONOMY, array( __CLASS__, 'save_showcase_meta' ) );
@@ -151,20 +153,30 @@ class SVC_Topics {
 	}
 
 	/**
-	 * Topics that sync from a Vimeo showcase.
-	 *
-	 * @return array[] Each: array{term_id: int, showcase_id: string}.
+	 * Term meta key holding a topic's source ID for a provider.
 	 */
-	public static function synced_topics() {
+	private static function source_meta_key( $provider ) {
+		return 'bunny' === $provider ? self::COLLECTION_META : self::SHOWCASE_META;
+	}
+
+	/**
+	 * Topics that sync from a provider source: a Vimeo showcase or a Bunny
+	 * Stream collection. A topic may be linked to both at once.
+	 *
+	 * @param string $provider 'vimeo' or 'bunny'.
+	 * @return array[] Each: array{term_id: int, source_id: string, name: string}.
+	 */
+	public static function synced_topics( $provider = 'vimeo' ) {
 		$synced = array();
+		$key    = self::source_meta_key( $provider );
 
 		foreach ( self::all_topics() as $topic ) {
-			$showcase = get_term_meta( $topic->term_id, self::SHOWCASE_META, true );
-			if ( $showcase ) {
+			$source = get_term_meta( $topic->term_id, $key, true );
+			if ( $source ) {
 				$synced[] = array(
-					'term_id'     => (int) $topic->term_id,
-					'showcase_id' => $showcase,
-					'name'        => $topic->name,
+					'term_id'   => (int) $topic->term_id,
+					'source_id' => $source,
+					'name'      => $topic->name,
 				);
 			}
 		}
@@ -173,18 +185,58 @@ class SVC_Topics {
 	}
 
 	/**
-	 * Term IDs whose membership is owned by sync (showcase-backed topics).
-	 * Manual topics are never touched by sync.
+	 * Term IDs whose membership is owned by a provider's sync. Manual topics
+	 * are never touched by sync.
 	 *
+	 * @param string $provider 'vimeo' or 'bunny'.
 	 * @return int[]
 	 */
-	public static function synced_term_ids() {
+	public static function synced_term_ids( $provider = 'vimeo' ) {
 		return array_map(
 			function ( $topic ) {
 				return $topic['term_id'];
 			},
-			self::synced_topics()
+			self::synced_topics( $provider )
 		);
+	}
+
+	/**
+	 * The Bunny collection control: a dropdown of the library's collections
+	 * when the API is reachable, a plain GUID field otherwise.
+	 */
+	private static function render_collection_control( $current ) {
+		$collections = svc_bunny_configured() ? SVC_Bunny_API::collection_names() : null;
+
+		if ( is_array( $collections ) ) {
+			// Keep a saved collection selectable even if Bunny no longer lists it.
+			if ( $current && ! isset( $collections[ $current ] ) ) {
+				/* translators: %s: collection ID */
+				$collections[ $current ] = sprintf( __( 'Missing collection (%s)', 'parish-video-center' ), $current );
+			}
+			?>
+			<select id="svc-topic-collection" name="svc_bunny_collection_id">
+				<option value=""><?php esc_html_e( '— None —', 'parish-video-center' ); ?></option>
+				<?php foreach ( $collections as $guid => $name ) : ?>
+					<option value="<?php echo esc_attr( $guid ); ?>" <?php selected( $current, $guid ); ?>><?php echo esc_html( $name ); ?></option>
+				<?php endforeach; ?>
+			</select>
+			<?php
+			return;
+		}
+		?>
+		<input type="text" id="svc-topic-collection" name="svc_bunny_collection_id" value="<?php echo esc_attr( $current ); ?>" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+		<?php if ( is_wp_error( $collections ) ) : ?>
+			<p><em><?php echo esc_html( $collections->get_error_message() ); ?></em></p>
+		<?php endif; ?>
+		<?php
+	}
+
+	private static function showcase_help() {
+		return __( 'The number in the showcase URL. Videos in that showcase sync into this topic automatically.', 'parish-video-center' );
+	}
+
+	private static function collection_help() {
+		return __( 'Videos in this video library collection sync into this topic automatically. Leave both sources empty for a topic you curate by hand on the video edit screens.', 'parish-video-center' );
 	}
 
 	public static function add_form_field() {
@@ -193,20 +245,33 @@ class SVC_Topics {
 		<div class="form-field">
 			<label for="svc-topic-showcase"><?php esc_html_e( 'Vimeo Showcase ID', 'parish-video-center' ); ?></label>
 			<input type="text" id="svc-topic-showcase" name="svc_showcase_id" value="" inputmode="numeric">
-			<p><?php esc_html_e( 'The number in the showcase URL. Videos in that showcase sync into this topic automatically. Leave empty for a topic you curate by hand on the video edit screens.', 'parish-video-center' ); ?></p>
+			<p><?php echo esc_html( self::showcase_help() ); ?></p>
+		</div>
+		<div class="form-field">
+			<label for="svc-topic-collection"><?php esc_html_e( 'Video Library Collection', 'parish-video-center' ); ?></label>
+			<?php self::render_collection_control( '' ); ?>
+			<p><?php echo esc_html( self::collection_help() ); ?></p>
 		</div>
 		<?php
 	}
 
 	public static function edit_form_field( $term ) {
 		wp_nonce_field( 'svc_topic_showcase', 'svc_topic_showcase_nonce' );
-		$showcase = get_term_meta( $term->term_id, self::SHOWCASE_META, true );
+		$showcase   = get_term_meta( $term->term_id, self::SHOWCASE_META, true );
+		$collection = get_term_meta( $term->term_id, self::COLLECTION_META, true );
 		?>
 		<tr class="form-field">
 			<th scope="row"><label for="svc-topic-showcase"><?php esc_html_e( 'Vimeo Showcase ID', 'parish-video-center' ); ?></label></th>
 			<td>
 				<input type="text" id="svc-topic-showcase" name="svc_showcase_id" value="<?php echo esc_attr( $showcase ); ?>" inputmode="numeric">
-				<p class="description"><?php esc_html_e( 'The number in the showcase URL. Videos in that showcase sync into this topic automatically. Leave empty for a topic you curate by hand on the video edit screens.', 'parish-video-center' ); ?></p>
+				<p class="description"><?php echo esc_html( self::showcase_help() ); ?></p>
+			</td>
+		</tr>
+		<tr class="form-field">
+			<th scope="row"><label for="svc-topic-collection"><?php esc_html_e( 'Video Library Collection', 'parish-video-center' ); ?></label></th>
+			<td>
+				<?php self::render_collection_control( $collection ); ?>
+				<p class="description"><?php echo esc_html( self::collection_help() ); ?></p>
 			</td>
 		</tr>
 		<?php
@@ -217,20 +282,29 @@ class SVC_Topics {
 			|| ! wp_verify_nonce( sanitize_key( wp_unslash( $_POST['svc_topic_showcase_nonce'] ) ), 'svc_topic_showcase' ) ) {
 			return;
 		}
-		if ( ! isset( $_POST['svc_showcase_id'] ) ) {
-			return;
+
+		if ( isset( $_POST['svc_showcase_id'] ) ) {
+			$showcase = preg_replace( '/\D/', '', wp_unslash( $_POST['svc_showcase_id'] ) ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- digits only survive.
+			if ( $showcase ) {
+				update_term_meta( $term_id, self::SHOWCASE_META, $showcase );
+			} else {
+				delete_term_meta( $term_id, self::SHOWCASE_META );
+			}
 		}
 
-		$showcase = preg_replace( '/\D/', '', wp_unslash( $_POST['svc_showcase_id'] ) ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- digits only survive.
-		if ( $showcase ) {
-			update_term_meta( $term_id, self::SHOWCASE_META, $showcase );
-		} else {
-			delete_term_meta( $term_id, self::SHOWCASE_META );
+		if ( isset( $_POST['svc_bunny_collection_id'] ) ) {
+			// Collection IDs are GUIDs; anything else is discarded.
+			$collection = strtolower( trim( sanitize_text_field( wp_unslash( $_POST['svc_bunny_collection_id'] ) ) ) );
+			if ( preg_match( '/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/', $collection ) ) {
+				update_term_meta( $term_id, self::COLLECTION_META, $collection );
+			} else {
+				delete_term_meta( $term_id, self::COLLECTION_META );
+			}
 		}
 	}
 
 	public static function columns( $columns ) {
-		$columns['svc_showcase'] = __( 'Showcase', 'parish-video-center' );
+		$columns['svc_showcase'] = __( 'Source', 'parish-video-center' );
 		return $columns;
 	}
 
@@ -239,10 +313,18 @@ class SVC_Topics {
 			return $content;
 		}
 
+		$parts    = array();
 		$showcase = get_term_meta( $term_id, self::SHOWCASE_META, true );
+		if ( $showcase ) {
+			/* translators: %s: Vimeo showcase ID */
+			$parts[] = esc_html( sprintf( __( 'Vimeo showcase %s', 'parish-video-center' ), $showcase ) );
+		}
+		if ( get_term_meta( $term_id, self::COLLECTION_META, true ) ) {
+			$parts[] = esc_html__( 'Library collection', 'parish-video-center' );
+		}
 
-		return $showcase
-			? esc_html( $showcase )
+		return $parts
+			? implode( '<br>', $parts )
 			: '<em>' . esc_html__( 'manual', 'parish-video-center' ) . '</em>';
 	}
 }

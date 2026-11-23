@@ -22,7 +22,7 @@ class SVC_Post_Type {
 	public static function add_lock_meta_box() {
 		add_meta_box(
 			'svc-sync-lock',
-			__( 'Vimeo Sync', 'parish-video-center' ),
+			__( 'Video Sync', 'parish-video-center' ),
 			array( __CLASS__, 'render_lock_meta_box' ),
 			self::POST_TYPE,
 			'side'
@@ -35,9 +35,9 @@ class SVC_Post_Type {
 		?>
 		<label for="svc-sync-lock-field">
 			<input type="checkbox" id="svc-sync-lock-field" name="svc_sync_lock" value="1" <?php checked( $locked ); ?>>
-			<?php esc_html_e( "Don't overwrite with Vimeo data", 'parish-video-center' ); ?>
+			<?php esc_html_e( "Don't overwrite with synced data", 'parish-video-center' ); ?>
 		</label>
-		<p class="description"><?php esc_html_e( 'When checked, sync leaves this post alone entirely: the title, description, status, and featured image you set here are preserved, and it will not be unpublished if the video leaves the showcase.', 'parish-video-center' ); ?></p>
+		<p class="description"><?php esc_html_e( 'When checked, sync leaves this post alone entirely: the title, description, status, and featured image you set here are preserved, and it will not be unpublished if the video leaves its showcase or collection.', 'parish-video-center' ); ?></p>
 		<?php
 	}
 
@@ -86,7 +86,7 @@ class SVC_Post_Type {
 					/* translators: %s: plural video label */
 					'all_items'     => sprintf( __( 'All %s', 'parish-video-center' ), $plural ),
 				),
-				'description'  => __( 'Videos synced from Vimeo showcases.', 'parish-video-center' ),
+				'description'  => __( 'Videos synced from Vimeo showcases and video library collections.', 'parish-video-center' ),
 				'public'       => true,
 				// Fixed /video/ base: single videos are watch pages, and the
 				// /video/<slug>/ pattern is itself a signal Google associates

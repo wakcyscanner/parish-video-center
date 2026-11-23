@@ -21,7 +21,7 @@ class SVC_Vimeo_API {
 
 		// 'files' (direct .mp4 links, used for schema contentUrl) requires the
 		// video_files token scope and a Vimeo plan that offers file links.
-		$fields = 'uri,name,description,created_time,duration,pictures.sizes,files';
+		$fields = 'uri,name,description,created_time,duration,width,height,pictures.sizes,pictures.base_link,files';
 
 		do {
 			$query = array(
@@ -74,6 +74,106 @@ class SVC_Vimeo_API {
 		}
 
 		return isset( $body['total'] ) ? (int) $body['total'] : count( $body['data'] );
+	}
+
+	/**
+	 * The downloadable file to copy for one video.
+	 *
+	 * @param string $video_id Vimeo video ID.
+	 * @param string $quality  'original', or a maximum quality: '1080' / '720'.
+	 * @return array|WP_Error array{link, size (bytes, 0 if unknown), height}, or WP_Error.
+	 *                        "height" is the quality figure — the frame's shorter
+	 *                        side — so a tall 720×1280 file counts as 720, like
+	 *                        a wide 1280×720 one.
+	 */
+	public static function source_file( $video_id, $quality = '1080' ) {
+		$token = svc_get_token();
+		if ( ! $token ) {
+			return new WP_Error( 'svc_no_token', __( 'No Vimeo access token configured.', 'parish-video-center' ) );
+		}
+
+		$video_id = preg_replace( '/\D/', '', (string) $video_id );
+		$response = wp_remote_get(
+			add_query_arg( 'fields', 'uri,files,download', 'https://api.vimeo.com/videos/' . rawurlencode( $video_id ) ),
+			array(
+				'timeout' => 20,
+				'headers' => array(
+					'Authorization' => 'Bearer ' . $token,
+					'Accept'        => 'application/vnd.vimeo.*+json;version=3.4',
+				),
+			)
+		);
+		if ( is_wp_error( $response ) ) {
+			return $response;
+		}
+
+		$code = wp_remote_retrieve_response_code( $response );
+		if ( 200 !== $code ) {
+			return new WP_Error( 'svc_http_' . $code, self::http_error_message( $code ) );
+		}
+
+		$body = json_decode( wp_remote_retrieve_body( $response ), true );
+
+		// "download" lists the original upload and renditions; "files" lists
+		// the streaming renditions. Either may be missing, depending on the plan.
+		$candidates = array();
+		foreach ( array( 'download', 'files' ) as $list ) {
+			foreach ( isset( $body[ $list ] ) && is_array( $body[ $list ] ) ? $body[ $list ] : array() as $file ) {
+				if ( empty( $file['link'] ) ) {
+					continue;
+				}
+				$kind = isset( $file['quality'] ) ? (string) $file['quality'] : '';
+				if ( in_array( $kind, array( 'hls', 'dash' ), true ) ) {
+					continue;
+				}
+				$height = isset( $file['height'] ) ? (int) $file['height'] : 0;
+				$width  = isset( $file['width'] ) ? (int) $file['width'] : 0;
+
+				$candidates[] = array(
+					'link'     => (string) $file['link'],
+					'size'     => isset( $file['size'] ) ? (int) $file['size'] : 0,
+					'height'   => $width > 0 && $width < $height ? $width : $height,
+					'original' => 'source' === $kind,
+				);
+			}
+		}
+
+		if ( ! $candidates ) {
+			return new WP_Error( 'svc_no_file', __( 'Vimeo did not offer a file to copy for this video. The access token needs the "video_files" scope, and the Vimeo plan must allow file access.', 'parish-video-center' ) );
+		}
+
+		// Tallest first; at equal height the original upload wins.
+		usort(
+			$candidates,
+			function ( $a, $b ) {
+				return $b['height'] === $a['height'] ? (int) $b['original'] - (int) $a['original'] : $b['height'] - $a['height'];
+			}
+		);
+
+		if ( 'original' === $quality ) {
+			foreach ( $candidates as $candidate ) {
+				if ( $candidate['original'] ) {
+					return $candidate;
+				}
+			}
+			return $candidates[0];
+		}
+
+		// The best rendition within the cap, skipping the (much larger)
+		// original when a regular rendition of the same height exists.
+		$cap  = (int) $quality;
+		$pick = null;
+		foreach ( $candidates as $candidate ) {
+			if ( $candidate['height'] > $cap ) {
+				continue;
+			}
+			if ( null === $pick || ( $pick['original'] && ! $candidate['original'] && $candidate['height'] === $pick['height'] ) ) {
+				$pick = $candidate;
+			}
+		}
+
+		// Nothing that small: fall back to the smallest file there is.
+		return $pick ? $pick : $candidates[ count( $candidates ) - 1 ];
 	}
 
 	/**

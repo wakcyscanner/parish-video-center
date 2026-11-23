@@ -26,7 +26,7 @@ while ( have_posts() ) :
 				<?php
 				/**
 				 * Player mode on single video pages. 'embed' renders the real
-				 * Vimeo iframe so search engines classify these as watch
+				 * player iframe so search engines classify these as watch
 				 * pages; return 'facade' to restore click-to-play.
 				 */
 				svc_render_player( get_the_ID(), apply_filters( 'svc_single_player_mode', 'embed' ) );

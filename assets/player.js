@@ -1,5 +1,5 @@
 /**
- * Click-to-play facade: swap the poster + play button for the Vimeo iframe on demand.
+ * Click-to-play facade: swap the poster + play button for the provider's player iframe on demand.
  */
 (function () {
 	'use strict';
@@ -13,19 +13,27 @@
 		document.head.appendChild(link);
 	}
 
-	function warmUp() {
-		preconnect('https://player.vimeo.com');
-		preconnect('https://i.vimeocdn.com');
-		preconnect('https://f.vimeocdn.com');
+	function warmUp(el) {
+		var src = el.getAttribute('data-embed-src');
+		if (!src) return;
+		try {
+			preconnect(new URL(src).origin);
+		} catch (e) {
+			return;
+		}
+		if (el.getAttribute('data-provider') === 'vimeo') {
+			preconnect('https://i.vimeocdn.com');
+			preconnect('https://f.vimeocdn.com');
+		}
 	}
 
 	function loadPlayer(el) {
-		var id = el.getAttribute('data-vimeo-id');
-		if (!id) return;
+		var src = el.getAttribute('data-embed-src');
+		if (!src) return;
 
 		var iframe = document.createElement('iframe');
-		iframe.src = 'https://player.vimeo.com/video/' + encodeURIComponent(id) + '?autoplay=1&dnt=1';
-		iframe.allow = 'autoplay; fullscreen; picture-in-picture';
+		iframe.src = src;
+		iframe.allow = 'autoplay; fullscreen; picture-in-picture; encrypted-media';
 		iframe.allowFullscreen = true;
 		iframe.title = el.getAttribute('data-title') || 'Video player';
 
@@ -34,15 +42,30 @@
 		el.appendChild(iframe);
 	}
 
+	// "Play on arrival" links (?play=1, used in email newsletters): start the
+	// watch page's player straight away. Muted, because browsers refuse
+	// autoplay with sound when the visitor hasn't touched the page yet. Only
+	// while the page is still loading — a script delayed until the first
+	// interaction must not restart a video someone is already watching.
+	(function () {
+		if (!/[?&]play=1(&|$)/.test(window.location.search)) return;
+		if (window.performance && performance.now() > 6000) return;
+		var frame = document.querySelector('.svc-single .svc-player iframe[data-autoplay-src]');
+		if (frame) frame.src = frame.getAttribute('data-autoplay-src');
+	})();
+
 	document.addEventListener('pointerover', function (e) {
-		if (e.target.closest && e.target.closest('.svc-player')) warmUp();
-	}, { once: true, passive: true });
+		var player = e.target.closest && e.target.closest('.svc-player');
+		if (player && !player.svcWarmed) {
+			player.svcWarmed = true;
+			warmUp(player);
+		}
+	}, { passive: true });
 
 	document.addEventListener('click', function (e) {
 		var player = e.target.closest && e.target.closest('.svc-player');
 		if (player && !player.classList.contains('svc-playing')) {
 			e.preventDefault();
-			warmUp();
 			loadPlayer(player);
 		}
 	});

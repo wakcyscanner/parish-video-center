@@ -1,6 +1,7 @@
 <?php
 /**
- * Sync engine: pulls the Vimeo showcase into video posts on a WP-Cron schedule.
+ * Sync engine: pulls Vimeo showcases and Bunny Stream collections into video
+ * posts on a WP-Cron schedule.
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -57,8 +58,8 @@ class SVC_Sync {
 	/**
 	 * Run a full sync: upsert posts, sideload changed thumbnails, draft removed videos.
 	 *
-	 * A run can hold a PHP worker for a while (Vimeo API paging across every
-	 * topic's showcase, thumbnail downloads and resizing), so overlapping runs
+	 * A run can hold a PHP worker for a while (API paging across every topic's
+	 * showcase or collection, thumbnail downloads and resizing), so overlapping runs
 	 * — hourly cron colliding with a manual Sync Now, or slow runs stacking up
 	 * — are refused via a lock. The lock expires on its own so a fatally
 	 * interrupted run can't wedge syncing for good.
@@ -81,64 +82,134 @@ class SVC_Sync {
 	/**
 	 * The sync itself; callers must hold the lock (see run()).
 	 *
+	 * Each provider (Vimeo showcases, Bunny collections) syncs independently:
+	 * one failing doesn't stop the other, but the run reports the failure.
+	 *
 	 * @return true|WP_Error
 	 */
 	private static function run_unlocked() {
-		$settings = svc_get_settings();
+		$messages = array();
+		$errors   = array();
+		$changes  = 0;
 
-		// Showcase-backed topics drive the sync; a site not yet using topics
-		// falls back to the legacy single-showcase setting (no term handling).
-		$topics = SVC_Topics::synced_topics();
-		$legacy = empty( $topics );
-		if ( $legacy ) {
-			$topics = array(
-				array(
-					'term_id'     => 0,
-					'showcase_id' => $settings['showcase_id'],
-					'name'        => '',
+		// Cap sideloads per run, across providers: each one is a download plus
+		// image resizing, and a new showcase/collection would otherwise do them
+		// all in one worker-hogging request. Videos over the cap keep their
+		// unchanged thumbnail_src meta and are picked up on subsequent runs.
+		$sideload_budget = (int) apply_filters( 'svc_max_thumbnail_sideloads', 10 );
+
+		foreach ( self::jobs() as $job ) {
+			$label  = SVC_Video::label( $job['provider'] );
+			$result = self::sync_provider( $job['provider'], $job['topics'], $job['legacy'], $sideload_budget );
+
+			if ( is_wp_error( $result ) ) {
+				$errors[] = sprintf( '%s: %s', $label, $result->get_error_message() );
+				continue;
+			}
+
+			$messages[] = sprintf( '%s: %s', $label, $result['message'] );
+			$changes   += $result['changes'];
+		}
+
+		update_option(
+			'svc_last_sync',
+			array(
+				'time'    => time(),
+				'status'  => $errors ? 'error' : 'ok',
+				'message' => implode( ' ', array_merge( $errors, $messages ) ),
+			),
+			false
+		);
+
+		// Sync writes posts programmatically, which page caches don't notice.
+		if ( $changes > 0 ) {
+			SVC_Cache::purge_all();
+		}
+
+		return $errors ? new WP_Error( 'svc_sync_failed', implode( ' ', $errors ) ) : true;
+	}
+
+	/**
+	 * What this run syncs: one job per provider that has source-backed topics.
+	 * A site with no such topics at all falls back to the legacy single
+	 * Vimeo showcase setting (no term handling).
+	 *
+	 * @return array[] Each: array{provider: string, topics: array[], legacy: bool}.
+	 */
+	private static function jobs() {
+		$jobs = array();
+
+		foreach ( SVC_Video::PROVIDERS as $provider ) {
+			$topics = SVC_Topics::synced_topics( $provider );
+			if ( $topics ) {
+				$jobs[] = array(
+					'provider' => $provider,
+					'topics'   => $topics,
+					'legacy'   => false,
+				);
+			}
+		}
+
+		if ( ! $jobs ) {
+			$settings = svc_get_settings();
+			$jobs[]   = array(
+				'provider' => 'vimeo',
+				'topics'   => array(
+					array(
+						'term_id'   => 0,
+						'source_id' => $settings['showcase_id'],
+						'name'      => '',
+					),
 				),
+				'legacy'   => true,
 			);
 		}
 
-		// Fetch every showcase up front. Any failure aborts the whole run:
-		// proceeding would draft all videos of the showcase that didn't load.
+		return $jobs;
+	}
+
+	/**
+	 * Sync one provider: upsert posts, sideload changed thumbnails, draft
+	 * videos that left their showcase/collection.
+	 *
+	 * @param string $provider        'vimeo' or 'bunny'.
+	 * @param array  $topics          Source-backed topics for this provider.
+	 * @param bool   $legacy          True for the pre-topics single-showcase config.
+	 * @param int    $sideload_budget Thumbnail sideloads left in this run (decremented).
+	 * @return array|WP_Error array{message: string, changes: int}, or WP_Error.
+	 */
+	private static function sync_provider( $provider, $topics, $legacy, &$sideload_budget ) {
+		// Fetch every source up front. Any failure aborts this provider:
+		// proceeding would draft all videos of the source that didn't load.
 		$videos_by_id = array();
 		$terms_by_id  = array();
 
 		foreach ( $topics as $topic ) {
-			$videos = SVC_Vimeo_API::fetch_showcase_videos( $topic['showcase_id'] );
+			$videos = self::fetch( $provider, $topic['source_id'] );
 			if ( is_wp_error( $videos ) ) {
-				$message = $topic['name']
-					? sprintf( '%s: %s', $topic['name'], $videos->get_error_message() )
-					: $videos->get_error_message();
-				update_option(
-					'svc_last_sync',
-					array(
-						'time'    => time(),
-						'status'  => 'error',
-						'message' => $message,
-					),
-					false
-				);
-				return $videos;
+				return $topic['name']
+					? new WP_Error( $videos->get_error_code(), sprintf( '%s: %s', $topic['name'], $videos->get_error_message() ) )
+					: $videos;
 			}
 
 			foreach ( $videos as $video ) {
-				$vimeo_id = self::extract_id( isset( $video['uri'] ) ? $video['uri'] : '' );
-				if ( ! $vimeo_id ) {
-					continue;
-				}
-				if ( ! isset( $videos_by_id[ $vimeo_id ] ) ) {
-					$videos_by_id[ $vimeo_id ] = $video;
+				if ( ! isset( $videos_by_id[ $video['id'] ] ) ) {
+					$videos_by_id[ $video['id'] ] = $video;
 				}
 				if ( $topic['term_id'] ) {
-					$terms_by_id[ $vimeo_id ][] = $topic['term_id'];
+					$terms_by_id[ $video['id'] ][] = $topic['term_id'];
 				}
 			}
 		}
 
-		// Map existing posts by Vimeo ID (any non-trashed status, so drafted videos re-publish on return).
+		$id_key = '_' . $provider . '_id';
+
+		// Map existing posts by provider ID (any non-trashed status, so drafted
+		// videos re-publish on return). Posts currently playing from the other
+		// provider — e.g. migrated from Vimeo to Bunny — are not this
+		// provider's to manage; remember them so they aren't re-created.
 		$existing = array();
+		$foreign  = array();
 		$query    = new WP_Query(
 			array(
 				'post_type'      => SVC_Post_Type::POST_TYPE,
@@ -149,46 +220,57 @@ class SVC_Sync {
 			)
 		);
 		foreach ( $query->posts as $post_id ) {
-			$vimeo_id = get_post_meta( $post_id, '_vimeo_id', true );
-			if ( $vimeo_id ) {
-				$existing[ $vimeo_id ] = $post_id;
+			$video_id = get_post_meta( $post_id, $id_key, true );
+			if ( ! $video_id ) {
+				continue;
+			}
+			if ( SVC_Video::provider( $post_id ) === $provider ) {
+				$existing[ $video_id ] = $post_id;
+			} else {
+				$foreign[ $video_id ] = $post_id;
 			}
 		}
 
-		$created     = 0;
-		$updated     = 0;
-		$drafted     = 0;
-		$locked      = 0;
-		$thumbnails  = 0;
-		$seen        = array();
-		$synced_term_ids = $legacy ? array() : SVC_Topics::synced_term_ids();
+		$created        = 0;
+		$updated        = 0;
+		$drafted        = 0;
+		$locked         = 0;
+		$pending        = 0;
+		$thumbnails     = 0;
+		$seen           = array();
+		$owned_term_ids = $legacy ? array() : SVC_Topics::synced_term_ids( $provider );
 
-		foreach ( $videos_by_id as $vimeo_id => $video ) {
-			$seen[ $vimeo_id ] = true;
+		foreach ( $videos_by_id as $video_id => $video ) {
+			$seen[ $video_id ] = true;
 
-			$title        = isset( $video['name'] ) ? $video['name'] : '';
-			$description  = isset( $video['description'] ) ? (string) $video['description'] : '';
-			$created_time = isset( $video['created_time'] ) ? $video['created_time'] : '';
-			$duration     = isset( $video['duration'] ) ? (int) $video['duration'] : 0;
-			$thumbnail    = self::largest_thumbnail( $video );
+			if ( isset( $foreign[ $video_id ] ) ) {
+				continue;
+			}
+
+			// Still uploading/encoding: no post yet, but an existing post
+			// stays as it is rather than being drafted.
+			if ( ! $video['ready'] ) {
+				$pending++;
+				continue;
+			}
 
 			$postarr = array(
 				'post_type'    => SVC_Post_Type::POST_TYPE,
 				'post_status'  => 'publish',
-				'post_title'   => $title,
-				'post_content' => $description,
+				'post_title'   => $video['title'],
+				'post_content' => $video['description'],
 			);
 
-			if ( $created_time ) {
-				$timestamp = strtotime( $created_time );
+			if ( $video['created'] ) {
+				$timestamp = strtotime( $video['created'] );
 				if ( $timestamp ) {
 					$postarr['post_date_gmt'] = gmdate( 'Y-m-d H:i:s', $timestamp );
 					$postarr['post_date']     = get_date_from_gmt( $postarr['post_date_gmt'] );
 				}
 			}
 
-			if ( isset( $existing[ $vimeo_id ] ) ) {
-				$post_id = $existing[ $vimeo_id ];
+			if ( isset( $existing[ $video_id ] ) ) {
+				$post_id = $existing[ $video_id ];
 
 				// Editor opted this post out of sync — leave it entirely untouched.
 				if ( get_post_meta( $post_id, '_svc_sync_lock', true ) ) {
@@ -198,9 +280,15 @@ class SVC_Sync {
 
 				$post = get_post( $post_id );
 
+				// A video moved over from Vimeo keeps its original date; the
+				// library only knows the day it was copied.
+				if ( 'bunny' === $provider && get_post_meta( $post_id, '_vimeo_id', true ) ) {
+					unset( $postarr['post_date'], $postarr['post_date_gmt'] );
+				}
+
 				$changed = $post
-					&& ( $post->post_title !== $title
-						|| $post->post_content !== $description
+					&& ( $post->post_title !== $video['title']
+						|| $post->post_content !== $video['description']
 						|| 'publish' !== $post->post_status );
 
 				if ( $changed ) {
@@ -213,31 +301,45 @@ class SVC_Sync {
 				if ( is_wp_error( $post_id ) ) {
 					continue;
 				}
+				update_post_meta( $post_id, SVC_Video::PROVIDER_META, $provider );
 				$created++;
 			}
 
-			update_post_meta( $post_id, '_vimeo_id', $vimeo_id );
-			update_post_meta( $post_id, '_vimeo_duration', $duration );
+			update_post_meta( $post_id, $id_key, $video_id );
+			update_post_meta( $post_id, '_' . $provider . '_duration', $video['duration'] );
 
-			// Direct progressive .mp4 link (Vimeo plans with file links only):
-			// becomes schema contentUrl / sitemap content_loc, Google's
-			// preferred fetch target for video indexing. Refreshed every sync
-			// so the signed URL stays current; cleared if the plan loses it.
-			$file_url = self::progressive_file( $video );
-			if ( $file_url ) {
-				update_post_meta( $post_id, '_vimeo_file_url', $file_url );
-			} else {
-				delete_post_meta( $post_id, '_vimeo_file_url' );
+			// Frame shape, so players and share pictures fit tall videos.
+			if ( $video['width'] && $video['height'] ) {
+				update_post_meta( $post_id, '_' . $provider . '_width', $video['width'] );
+				update_post_meta( $post_id, '_' . $provider . '_height', $video['height'] );
 			}
 
-			// Topic membership: sync owns the showcase-backed topics — replace
-			// those — but never touches manually curated ones.
+			if ( 'bunny' === $provider ) {
+				update_post_meta( $post_id, '_bunny_library_id', $video['library_id'] );
+				// Marks the post as collection-managed: only these are
+				// drafted when their video leaves every linked collection.
+				update_post_meta( $post_id, '_bunny_synced', '1' );
+			}
+
+			// Direct .mp4 link: becomes schema contentUrl / sitemap
+			// content_loc, Google's preferred fetch target for video indexing.
+			// Refreshed every sync (Vimeo's are signed and expire); cleared
+			// when the provider stops offering one.
+			if ( $video['file_url'] ) {
+				update_post_meta( $post_id, '_' . $provider . '_file_url', $video['file_url'] );
+			} else {
+				delete_post_meta( $post_id, '_' . $provider . '_file_url' );
+			}
+
+			// Topic membership: sync owns this provider's source-backed topics
+			// — replace those — but never touches manually curated ones or
+			// the other provider's.
 			if ( ! $legacy ) {
 				$current = wp_get_object_terms( $post_id, SVC_Topics::TAXONOMY, array( 'fields' => 'ids' ) );
 				$manual  = is_wp_error( $current )
 					? array()
-					: array_diff( array_map( 'intval', $current ), $synced_term_ids );
-				$wanted  = isset( $terms_by_id[ $vimeo_id ] ) ? $terms_by_id[ $vimeo_id ] : array();
+					: array_diff( array_map( 'intval', $current ), $owned_term_ids );
+				$wanted  = isset( $terms_by_id[ $video_id ] ) ? $terms_by_id[ $video_id ] : array();
 				wp_set_object_terms(
 					$post_id,
 					array_values( array_unique( array_merge( $manual, $wanted ) ) ),
@@ -245,62 +347,156 @@ class SVC_Sync {
 				);
 			}
 
-			// Cap sideloads per run: each one is a download plus image
-			// resizing, and a new showcase would otherwise do them all in one
-			// worker-hogging request. Videos over the cap keep their unchanged
-			// _vimeo_thumbnail_src and are picked up on subsequent runs.
-			$max_sideloads = (int) apply_filters( 'svc_max_thumbnail_sideloads', 10 );
+			$thumb_key = '_' . $provider . '_thumbnail_src';
 
-			if ( $thumbnail && $thumbnails < $max_sideloads && get_post_meta( $post_id, '_vimeo_thumbnail_src', true ) !== $thumbnail ) {
-				$attachment_id = self::sideload_thumbnail( $thumbnail, $post_id, $title, $vimeo_id );
+			if ( $video['thumbnail'] && $sideload_budget > 0 && get_post_meta( $post_id, $thumb_key, true ) !== $video['thumbnail'] ) {
+				$attachment_id = self::sideload_thumbnail( $video['thumbnail'], $post_id, $video['title'], $provider . '-' . $video_id );
 				if ( $attachment_id ) {
 					set_post_thumbnail( $post_id, $attachment_id );
-					update_post_meta( $post_id, '_vimeo_thumbnail_src', $thumbnail );
+					update_post_meta( $post_id, $thumb_key, $video['thumbnail'] );
 					$thumbnails++;
+					$sideload_budget--;
 				}
 			}
 		}
 
-		// Videos that left the showcase get unpublished, not deleted.
-		foreach ( $existing as $vimeo_id => $post_id ) {
-			if ( ! isset( $seen[ $vimeo_id ] )
-				&& 'publish' === get_post_status( $post_id )
-				&& ! get_post_meta( $post_id, '_svc_sync_lock', true ) ) {
-				wp_update_post(
-					array(
-						'ID'          => $post_id,
-						'post_status' => 'draft',
-					)
-				);
-				$drafted++;
+		// Videos that left the showcase/collection get unpublished, not deleted.
+		foreach ( $existing as $video_id => $post_id ) {
+			if ( isset( $seen[ $video_id ] )
+				|| 'publish' !== get_post_status( $post_id )
+				|| get_post_meta( $post_id, '_svc_sync_lock', true ) ) {
+				continue;
+			}
+			// A Bunny post that never came from a linked collection (e.g. a
+			// migrated video) isn't sync's to unpublish.
+			if ( 'bunny' === $provider && ! get_post_meta( $post_id, '_bunny_synced', true ) ) {
+				continue;
+			}
+
+			wp_update_post(
+				array(
+					'ID'          => $post_id,
+					'post_status' => 'draft',
+				)
+			);
+			$drafted++;
+		}
+
+		$message = sprintf(
+			/* translators: 1: total videos, 2: created, 3: updated, 4: unpublished, 5: locked, 6: number of showcases/collections */
+			__( '%1$d videos across %6$d source(s): %2$d created, %3$d updated, %4$d unpublished, %5$d locked.', 'parish-video-center' ),
+			count( $videos_by_id ),
+			$created,
+			$updated,
+			$drafted,
+			$locked,
+			count( $topics )
+		);
+		if ( $pending ) {
+			/* translators: %d: number of videos */
+			$message .= ' ' . sprintf( __( '%d still processing.', 'parish-video-center' ), $pending );
+		}
+
+		return array(
+			'message' => $message,
+			'changes' => $created + $updated + $drafted + $thumbnails,
+		);
+	}
+
+	/**
+	 * Fetch one source's videos in provider-neutral form.
+	 *
+	 * @return array[]|WP_Error Each: array{id, title, description, created,
+	 *                          duration, width, height, thumbnail, file_url,
+	 *                          ready, library_id}.
+	 */
+	private static function fetch( $provider, $source_id ) {
+		$raw = 'bunny' === $provider
+			? SVC_Bunny_API::list_videos( $source_id )
+			: SVC_Vimeo_API::fetch_showcase_videos( $source_id );
+
+		if ( is_wp_error( $raw ) ) {
+			return $raw;
+		}
+
+		$videos = array();
+		foreach ( $raw as $video ) {
+			$normalized = 'bunny' === $provider ? self::normalize_bunny( $video ) : self::normalize_vimeo( $video );
+			if ( $normalized ) {
+				$videos[] = $normalized;
 			}
 		}
 
-		update_option(
-			'svc_last_sync',
-			array(
-				'time'    => time(),
-				'status'  => 'ok',
-				'message' => sprintf(
-					/* translators: 1: total videos, 2: created, 3: updated, 4: unpublished, 5: locked */
-					__( '%1$d videos across %6$d showcase(s): %2$d created, %3$d updated, %4$d unpublished, %5$d locked.', 'parish-video-center' ),
-					count( $videos_by_id ),
-					$created,
-					$updated,
-					$drafted,
-					$locked,
-					count( $topics )
-				),
-			),
-			false
-		);
+		return $videos;
+	}
 
-		// Sync writes posts programmatically, which page caches don't notice.
-		if ( $created + $updated + $drafted + $thumbnails > 0 ) {
-			SVC_Cache::purge_all();
+	private static function normalize_vimeo( $video ) {
+		$id = self::extract_id( isset( $video['uri'] ) ? $video['uri'] : '' );
+		if ( ! $id ) {
+			return null;
 		}
 
-		return true;
+		return array(
+			'id'          => $id,
+			'title'       => isset( $video['name'] ) ? (string) $video['name'] : '',
+			'description' => isset( $video['description'] ) ? (string) $video['description'] : '',
+			'created'     => isset( $video['created_time'] ) ? (string) $video['created_time'] : '',
+			'duration'    => isset( $video['duration'] ) ? (int) $video['duration'] : 0,
+			'width'       => isset( $video['width'] ) ? (int) $video['width'] : 0,
+			'height'      => isset( $video['height'] ) ? (int) $video['height'] : 0,
+			'thumbnail'   => self::largest_thumbnail( $video ),
+			'file_url'    => self::progressive_file( $video ),
+			'ready'       => true,
+			'library_id'  => '',
+		);
+	}
+
+	/**
+	 * A raw library video in provider-neutral form (see fetch()).
+	 */
+	public static function normalize_bunny( $video ) {
+		if ( empty( $video['guid'] ) ) {
+			return null;
+		}
+
+		$config = svc_bunny_config();
+		$guid   = (string) $video['guid'];
+		$base   = $config['cdn_host'] ? 'https://' . $config['cdn_host'] . '/' . $guid . '/' : '';
+
+		$thumbnail = '';
+		if ( ! empty( $video['thumbnailUrl'] ) ) {
+			$thumbnail = (string) $video['thumbnailUrl'];
+		} elseif ( $base && ! empty( $video['thumbnailFileName'] ) ) {
+			$thumbnail = $base . $video['thumbnailFileName'];
+		}
+
+		// MP4 fallback (a library encoding setting) is the only fixed-URL
+		// progressive file Bunny serves. 720p first: a crawler doesn't need
+		// more, and it keeps bandwidth down.
+		$file_url = '';
+		if ( $base && ! empty( $video['hasMP4Fallback'] ) && ! empty( $video['availableResolutions'] ) ) {
+			$available = array_map( 'trim', explode( ',', (string) $video['availableResolutions'] ) );
+			foreach ( array( '720p', '360p', '240p' ) as $resolution ) {
+				if ( in_array( $resolution, $available, true ) ) {
+					$file_url = $base . 'play_' . $resolution . '.mp4';
+					break;
+				}
+			}
+		}
+
+		return array(
+			'id'          => $guid,
+			'title'       => isset( $video['title'] ) ? (string) $video['title'] : '',
+			'description' => isset( $video['description'] ) ? (string) $video['description'] : '',
+			'created'     => isset( $video['dateUploaded'] ) ? (string) $video['dateUploaded'] : '',
+			'duration'    => isset( $video['length'] ) ? (int) $video['length'] : 0,
+			'width'       => isset( $video['width'] ) ? (int) $video['width'] : 0,
+			'height'      => isset( $video['height'] ) ? (int) $video['height'] : 0,
+			'thumbnail'   => $thumbnail,
+			'file_url'    => (string) apply_filters( 'svc_bunny_file_url', $file_url, $video ),
+			'ready'       => isset( $video['status'] ) && SVC_Bunny_API::STATUS_FINISHED === (int) $video['status'],
+			'library_id'  => isset( $video['videoLibraryId'] ) ? (string) $video['videoLibraryId'] : $config['library_id'],
+		);
 	}
 
 	/**
@@ -354,8 +550,23 @@ class SVC_Sync {
 
 	/**
 	 * Largest available thumbnail URL (Vimeo lists sizes smallest to largest).
+	 *
+	 * Every listed size is 16:9, so a tall video's picture comes padded with
+	 * black bars at the sides. For those, ask Vimeo's image server for the
+	 * picture in the video's own shape instead.
 	 */
 	private static function largest_thumbnail( $video ) {
+		$width  = isset( $video['width'] ) ? (int) $video['width'] : 0;
+		$height = isset( $video['height'] ) ? (int) $video['height'] : 0;
+
+		if ( $height > $width && $width > 0 && ! empty( $video['pictures']['base_link'] ) ) {
+			$scale = min( 1, 1920 / $height );
+			$parts = explode( '?', (string) $video['pictures']['base_link'], 2 );
+
+			return $parts[0] . '_' . (int) round( $width * $scale ) . 'x' . (int) round( $height * $scale )
+				. ( isset( $parts[1] ) ? '?' . $parts[1] : '' );
+		}
+
 		if ( empty( $video['pictures']['sizes'] ) || ! is_array( $video['pictures']['sizes'] ) ) {
 			return '';
 		}
@@ -370,20 +581,31 @@ class SVC_Sync {
 	 *
 	 * @return int Attachment ID, or 0 on failure.
 	 */
-	private static function sideload_thumbnail( $url, $post_id, $title, $vimeo_id ) {
+	private static function sideload_thumbnail( $url, $post_id, $title, $basename ) {
 		require_once ABSPATH . 'wp-admin/includes/file.php';
 		require_once ABSPATH . 'wp-admin/includes/media.php';
 		require_once ABSPATH . 'wp-admin/includes/image.php';
 
 		// 30s cap — the default is 300s, which would hold a PHP worker for
 		// five minutes per stalled CDN connection.
+		//
+		// Send this site as the Referer: a Bunny library with "block direct
+		// URL file access" on answers referrer-less requests with 403.
+		$add_referer = function ( $args ) {
+			$args['headers']            = isset( $args['headers'] ) && is_array( $args['headers'] ) ? $args['headers'] : array();
+			$args['headers']['Referer'] = home_url( '/' );
+			return $args;
+		};
+		add_filter( 'http_request_args', $add_referer );
 		$tmp = download_url( $url, 30 );
+		remove_filter( 'http_request_args', $add_referer );
+
 		if ( is_wp_error( $tmp ) ) {
 			return 0;
 		}
 
 		$file_array = array(
-			'name'     => 'vimeo-' . $vimeo_id . '.jpg',
+			'name'     => $basename . '.jpg',
 			'tmp_name' => $tmp,
 		);
 

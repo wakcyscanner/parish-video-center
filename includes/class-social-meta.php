@@ -24,17 +24,20 @@ class SVC_Social_Meta {
 			return;
 		}
 
-		$vimeo_id = get_post_meta( $post->ID, '_vimeo_id', true );
-		if ( ! $vimeo_id ) {
+		$player = SVC_Video::embed_url( $post->ID );
+		if ( ! $player ) {
 			return;
 		}
 
-		$player      = 'https://player.vimeo.com/video/' . rawurlencode( $vimeo_id ) . '?dnt=1';
 		$title       = get_the_title( $post );
 		$description = '' !== trim( (string) $post->post_content )
 			? wp_trim_words( wp_strip_all_tags( $post->post_content ), 30 )
 			: $title;
-		$image       = get_the_post_thumbnail_url( $post, 'full' );
+		$image       = wp_get_attachment_image_src( get_post_thumbnail_id( $post ), 'full' );
+
+		// The video's real shape: a tall video announced as 1280×720 gets a
+		// wide, letterboxed card wherever the link is shared.
+		list( $width, $height ) = SVC_Video::dimensions( $post->ID );
 
 		$tags = array();
 
@@ -48,24 +51,26 @@ class SVC_Social_Meta {
 			$tags['og:url']         = get_permalink( $post );
 			$tags['og:site_name']   = get_bloginfo( 'name' );
 			if ( $image ) {
-				$tags['og:image'] = $image;
+				$tags['og:image']        = $image[0];
+				$tags['og:image:width']  = (string) $image[1];
+				$tags['og:image:height'] = (string) $image[2];
 			}
 			$tags['twitter:card']          = 'player';
 			$tags['twitter:title']         = $title;
 			$tags['twitter:description']   = $description;
 			if ( $image ) {
-				$tags['twitter:image'] = $image;
+				$tags['twitter:image'] = $image[0];
 			}
 			$tags['twitter:player']        = $player;
-			$tags['twitter:player:width']  = '1280';
-			$tags['twitter:player:height'] = '720';
+			$tags['twitter:player:width']  = (string) $width;
+			$tags['twitter:player:height'] = (string) $height;
 		}
 
 		$tags['og:video']            = $player;
 		$tags['og:video:secure_url'] = $player;
 		$tags['og:video:type']       = 'text/html';
-		$tags['og:video:width']      = '1280';
-		$tags['og:video:height']     = '720';
+		$tags['og:video:width']      = (string) $width;
+		$tags['og:video:height']     = (string) $height;
 
 		/**
 		 * Filter the social meta tags before output. Return an empty array

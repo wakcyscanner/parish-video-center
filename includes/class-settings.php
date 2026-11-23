@@ -65,6 +65,15 @@ class SVC_Settings {
 			$token = $current['vimeo_token'];
 		}
 
+		// Same keep-unless-replaced rule for the Bunny API key.
+		if ( ! empty( $input['remove_bunny_api_key'] ) ) {
+			$bunny_key = '';
+		} elseif ( isset( $input['bunny_api_key'] ) && '' !== trim( $input['bunny_api_key'] ) ) {
+			$bunny_key = trim( sanitize_text_field( $input['bunny_api_key'] ) );
+		} else {
+			$bunny_key = $current['bunny_api_key'];
+		}
+
 		$singular = isset( $input['singular'] ) ? sanitize_text_field( $input['singular'] ) : $current['singular'];
 		$plural   = isset( $input['plural'] ) ? sanitize_text_field( $input['plural'] ) : $current['plural'];
 		if ( '' === trim( $singular ) ) {
@@ -90,6 +99,9 @@ class SVC_Settings {
 		return array(
 			'vimeo_token'    => $token,
 			'showcase_id'    => isset( $input['showcase_id'] ) ? preg_replace( '/\D/', '', $input['showcase_id'] ) : $current['showcase_id'],
+			'bunny_library_id' => isset( $input['bunny_library_id'] ) ? preg_replace( '/\D/', '', $input['bunny_library_id'] ) : $current['bunny_library_id'],
+			'bunny_api_key'    => $bunny_key,
+			'bunny_cdn_host'   => isset( $input['bunny_cdn_host'] ) ? svc_sanitize_hostname( $input['bunny_cdn_host'] ) : $current['bunny_cdn_host'],
 			'singular'       => $singular,
 			'plural'         => $plural,
 			'slug'           => $slug,
@@ -109,13 +121,15 @@ class SVC_Settings {
 		$screen      = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
 		$on_settings = $screen && self::$hook === $screen->id;
 
-		// Setup nag anywhere in admin until token and showcase are configured.
-		$settings = svc_get_settings();
-		if ( ! svc_get_token() || ! $settings['showcase_id'] ) {
+		// Setup nag anywhere in admin until a video provider is configured:
+		// Vimeo (token + showcase) or Bunny Stream (library + key).
+		$settings    = svc_get_settings();
+		$vimeo_ready = svc_get_token() && ( $settings['showcase_id'] || SVC_Topics::synced_topics( 'vimeo' ) );
+		if ( ! $vimeo_ready && ! svc_bunny_configured() ) {
 			if ( ! $on_settings ) {
 				printf(
 					'<div class="notice notice-warning"><p>%s <a href="%s">%s</a></p></div>',
-					esc_html__( 'Parish Video Center needs a Vimeo access token and showcase ID before it can sync.', 'parish-video-center' ),
+					esc_html__( 'Parish Video Center needs a video provider before it can sync: a Vimeo access token and showcase, or a Bunny Stream library ID and API key.', 'parish-video-center' ),
 					esc_url( self::url() ),
 					esc_html__( 'Open settings', 'parish-video-center' )
 				);
@@ -153,7 +167,7 @@ class SVC_Settings {
 	}
 
 	/**
-	 * Test the token + showcase against the Vimeo API without writing anything.
+	 * Test the configured providers' credentials without writing anything.
 	 */
 	public static function handle_test_connection() {
 		if ( ! current_user_can( 'manage_options' ) ) {
@@ -161,31 +175,51 @@ class SVC_Settings {
 		}
 		check_admin_referer( 'svc_test_connection' );
 
-		// Test every showcase-backed topic; legacy single-showcase config as fallback.
+		$parts  = array();
+		$status = 'ok';
+		$ran    = false;
+
+		// Vimeo: every showcase-backed topic; legacy single-showcase config as
+		// fallback. Skipped on a site that only uses Bunny.
 		$settings = svc_get_settings();
-		$topics   = SVC_Topics::synced_topics();
-		if ( ! $topics ) {
+		$topics   = SVC_Topics::synced_topics( 'vimeo' );
+		if ( ! $topics && ( $settings['showcase_id'] || ! svc_bunny_configured() ) ) {
 			$topics = array(
 				array(
-					'term_id'     => 0,
-					'showcase_id' => $settings['showcase_id'],
-					'name'        => __( 'Showcase', 'parish-video-center' ),
+					'term_id'   => 0,
+					'source_id' => $settings['showcase_id'],
+					'name'      => __( 'Showcase', 'parish-video-center' ),
 				),
 			);
 		}
 
-		$parts  = array();
-		$status = 'ok';
-
 		foreach ( $topics as $topic ) {
-			$result = SVC_Vimeo_API::test_connection( $topic['showcase_id'] );
+			$ran    = true;
+			$result = SVC_Vimeo_API::test_connection( $topic['source_id'] );
 			if ( is_wp_error( $result ) ) {
 				$status  = 'error';
-				$parts[] = sprintf( '%s: %s', $topic['name'], $result->get_error_message() );
+				$parts[] = sprintf( 'Vimeo — %s: %s', $topic['name'], $result->get_error_message() );
 			} else {
 				/* translators: 1: topic name, 2: number of videos */
-				$parts[] = sprintf( __( '%1$s: %2$d videos', 'parish-video-center' ), $topic['name'], $result );
+				$parts[] = 'Vimeo — ' . sprintf( __( '%1$s: %2$d videos', 'parish-video-center' ), $topic['name'], $result );
 			}
+		}
+
+		if ( svc_bunny_configured() || SVC_Topics::synced_topics( 'bunny' ) ) {
+			$ran    = true;
+			$result = SVC_Bunny_API::test_connection();
+			if ( is_wp_error( $result ) ) {
+				$status  = 'error';
+				$parts[] = 'Bunny — ' . $result->get_error_message();
+			} else {
+				/* translators: %d: number of videos */
+				$parts[] = 'Bunny — ' . sprintf( __( 'library reachable, %d videos', 'parish-video-center' ), $result );
+			}
+		}
+
+		if ( ! $ran ) {
+			$status  = 'error';
+			$parts[] = __( 'Nothing to test — no video provider is configured', 'parish-video-center' );
 		}
 
 		set_transient(
@@ -209,6 +243,7 @@ class SVC_Settings {
 		$settings       = svc_get_settings();
 		$token_constant = defined( 'VIMEO_TOKEN' ) && VIMEO_TOKEN;
 		$has_token      = '' !== $settings['vimeo_token'];
+		$has_bunny_key  = '' !== $settings['bunny_api_key'];
 		$last           = get_option( 'svc_last_sync' );
 		$next           = wp_next_scheduled( SVC_Sync::CRON_HOOK );
 		?>
@@ -242,6 +277,56 @@ class SVC_Settings {
 						<td>
 							<p class="description">
 								<?php esc_html_e( 'Showcases are configured per topic: each topic with a Vimeo Showcase ID syncs automatically and gets its own landing page.', 'parish-video-center' ); ?>
+								<a href="<?php echo esc_url( admin_url( 'edit-tags.php?taxonomy=' . SVC_Topics::TAXONOMY . '&post_type=' . SVC_Post_Type::POST_TYPE ) ); ?>"><?php esc_html_e( 'Manage Topics', 'parish-video-center' ); ?></a>
+							</p>
+						</td>
+					</tr>
+				</table>
+
+				<h2><?php esc_html_e( 'Bunny Stream', 'parish-video-center' ); ?></h2>
+				<table class="form-table" role="presentation">
+					<tr>
+						<th scope="row"><label for="svc-bunny-library"><?php esc_html_e( 'Library ID', 'parish-video-center' ); ?></label></th>
+						<td>
+							<?php if ( defined( 'BUNNY_STREAM_LIBRARY_ID' ) && BUNNY_STREAM_LIBRARY_ID ) : ?>
+								<p><em><?php esc_html_e( 'Defined as BUNNY_STREAM_LIBRARY_ID in wp-config.php — the constant overrides this field.', 'parish-video-center' ); ?></em></p>
+							<?php endif; ?>
+							<input type="text" id="svc-bunny-library" name="svc_settings[bunny_library_id]" value="<?php echo esc_attr( $settings['bunny_library_id'] ); ?>" class="regular-text" inputmode="numeric">
+							<p class="description"><?php esc_html_e( 'The Video Library ID shown on the library\'s API page in the Bunny dashboard (Stream → your library → API).', 'parish-video-center' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="svc-bunny-key"><?php esc_html_e( 'API Key', 'parish-video-center' ); ?></label></th>
+						<td>
+							<?php if ( defined( 'BUNNY_STREAM_API_KEY' ) && BUNNY_STREAM_API_KEY ) : ?>
+								<p><em><?php esc_html_e( 'Defined as BUNNY_STREAM_API_KEY in wp-config.php — the constant overrides this field.', 'parish-video-center' ); ?></em></p>
+							<?php endif; ?>
+							<input type="password" id="svc-bunny-key" name="svc_settings[bunny_api_key]" value="" class="regular-text" autocomplete="off"
+								placeholder="<?php echo $has_bunny_key ? esc_attr__( 'Saved — leave blank to keep', 'parish-video-center' ) : ''; ?>">
+							<p class="description"><?php esc_html_e( 'The library\'s own API key from the same page — not the account-wide key. The saved key is never displayed here.', 'parish-video-center' ); ?></p>
+							<?php if ( $has_bunny_key ) : ?>
+								<label>
+									<input type="checkbox" name="svc_settings[remove_bunny_api_key]" value="1">
+									<?php esc_html_e( 'Remove the saved key', 'parish-video-center' ); ?>
+								</label>
+							<?php endif; ?>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="svc-bunny-host"><?php esc_html_e( 'CDN Hostname', 'parish-video-center' ); ?></label></th>
+						<td>
+							<?php if ( defined( 'BUNNY_STREAM_CDN_HOST' ) && BUNNY_STREAM_CDN_HOST ) : ?>
+								<p><em><?php esc_html_e( 'Defined as BUNNY_STREAM_CDN_HOST in wp-config.php — the constant overrides this field.', 'parish-video-center' ); ?></em></p>
+							<?php endif; ?>
+							<input type="text" id="svc-bunny-host" name="svc_settings[bunny_cdn_host]" value="<?php echo esc_attr( $settings['bunny_cdn_host'] ); ?>" class="regular-text" placeholder="vz-xxxxxxxx-xxx.b-cdn.net">
+							<p class="description"><?php esc_html_e( 'The library\'s pull zone hostname, also on the API page. Used for thumbnails and for the direct .mp4 link in structured data (which also needs "MP4 fallback" enabled in the library\'s encoding settings).', 'parish-video-center' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><?php esc_html_e( 'Collections', 'parish-video-center' ); ?></th>
+						<td>
+							<p class="description">
+								<?php esc_html_e( 'Collections are linked per topic: every video in a linked collection gets its own post and appears on that topic\'s landing page.', 'parish-video-center' ); ?>
 								<a href="<?php echo esc_url( admin_url( 'edit-tags.php?taxonomy=' . SVC_Topics::TAXONOMY . '&post_type=' . SVC_Post_Type::POST_TYPE ) ); ?>"><?php esc_html_e( 'Manage Topics', 'parish-video-center' ); ?></a>
 							</p>
 						</td>

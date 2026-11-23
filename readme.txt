@@ -72,6 +72,15 @@ Plugin options and scheduled events are removed. Video posts and sideloaded medi
 
 == Changelog ==
 
+= 1.14.0-beta.1 =
+* Video library: videos can now be hosted in a Bunny Stream library alongside, or instead of, Vimeo. Connect it under Settings (Library ID, API key, CDN hostname — or the BUNNY_STREAM_LIBRARY_ID / BUNNY_STREAM_API_KEY / BUNNY_STREAM_CDN_HOST constants in wp-config.php). A topic linked to a library collection syncs that collection into posts, the same way a Vimeo showcase does; videos in unlinked collections stay in the library without posts.
+* New "Video Library" screen: upload videos (resumable, straight from the browser to the library), edit titles and descriptions, replace thumbnails, preview, delete, and manage collections without leaving WordPress.
+* New "Move from Vimeo" screen: copy chosen videos from Vimeo into the library, a few at a time, with the transfer size shown before anything is copied. Each post keeps its address, date and thumbnail, and keeps playing from Vimeo until you switch it; switching back is one click. Needs a Vimeo token with the "private" and "video_files" scopes.
+* New [parish_video id="…"] shortcode and "Parish Video" block: put a single video — a video post, or a library video with no post — into any post or page.
+* Vertical videos: each video's shape is now recorded, and players are sized to it. A tall video gets a tall, centred player (capped on larger screens so the title stays in view) instead of a strip inside a wide box. Thumbnails for tall Vimeo videos are fetched in the video's own shape rather than padded with black bars.
+* New "Copy for email" action on the video list, the video edit screen and the Video Library: gives a ready-made picture with a play button (a tall video is shown whole on a blurred backdrop) and a link to the watch page, for pasting into an email newsletter. The link can start the video on arrival (muted) with ?play=1.
+* Open Graph / Twitter player tags and the VideoObject JSON-LD now carry each video's real dimensions instead of always 1280×720.
+
 = 1.13.0 =
 * Topics: videos are now organized into topics (Videos → Topics), each with its own root-level landing page (/homilies/, /parish-mission/, …) using the split-hero hub layout. A topic with a Vimeo Showcase ID syncs automatically; a topic without one is curated by hand from the video edit screens. The other topics appear as tab links above the browse grid. Existing sites are migrated automatically: the configured showcase becomes the first topic, keeping its landing page URL.
 * All single videos now live under /video/<slug>/ — the URL pattern search engines associate with watch pages — regardless of topic. Set up 301 redirects from the old single-video URLs (e.g. with the Redirection plugin); topic landing page URLs are unchanged.

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Parish Video Center
  * Description: Syncs a Vimeo showcase into WordPress video posts with a gallery archive, single video pages, and VideoObject structured data. Post labels and URL slug are configurable (Homilies, Sermons, Messages, …).
- * Version: 1.13.0
+ * Version: 1.14.0-beta.1
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Author: St. Paul the Apostle Catholic Church
@@ -15,16 +15,20 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'SVC_VERSION', '1.13.0' );
+define( 'SVC_VERSION', '1.14.0-beta.1' );
 define( 'SVC_PLUGIN_FILE', __FILE__ );
 define( 'SVC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SVC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
 require_once SVC_PLUGIN_DIR . 'includes/class-post-type.php';
 require_once SVC_PLUGIN_DIR . 'includes/class-topics.php';
+require_once SVC_PLUGIN_DIR . 'includes/class-video.php';
 require_once SVC_PLUGIN_DIR . 'includes/class-vimeo-api.php';
+require_once SVC_PLUGIN_DIR . 'includes/class-bunny-api.php';
 require_once SVC_PLUGIN_DIR . 'includes/class-sync.php';
 require_once SVC_PLUGIN_DIR . 'includes/class-settings.php';
+require_once SVC_PLUGIN_DIR . 'includes/class-bunny-library.php';
+require_once SVC_PLUGIN_DIR . 'includes/class-migrator.php';
 require_once SVC_PLUGIN_DIR . 'includes/class-structured-data.php';
 require_once SVC_PLUGIN_DIR . 'includes/class-redirects.php';
 require_once SVC_PLUGIN_DIR . 'includes/class-cache.php';
@@ -32,12 +36,16 @@ require_once SVC_PLUGIN_DIR . 'includes/class-updates.php';
 require_once SVC_PLUGIN_DIR . 'includes/class-social-meta.php';
 require_once SVC_PLUGIN_DIR . 'includes/class-sitemap.php';
 require_once SVC_PLUGIN_DIR . 'includes/class-embeds.php';
+require_once SVC_PLUGIN_DIR . 'includes/class-video-embed.php';
+require_once SVC_PLUGIN_DIR . 'includes/class-email-share.php';
 require_once SVC_PLUGIN_DIR . 'includes/class-rest.php';
 
 SVC_Post_Type::init();
 SVC_Topics::init();
 SVC_Sync::init();
 SVC_Settings::init();
+SVC_Bunny_Library::init();
+SVC_Migrator::init();
 SVC_Structured_Data::init();
 SVC_Redirects::init();
 SVC_Cache::init();
@@ -45,6 +53,8 @@ SVC_Updates::init();
 SVC_Social_Meta::init();
 SVC_Sitemap::init();
 SVC_Embeds::init();
+SVC_Video_Embed::init();
+SVC_Email_Share::init();
 SVC_Rest::init();
 
 /**
@@ -57,6 +67,9 @@ function svc_get_settings() {
 	$defaults = array(
 		'vimeo_token'    => '',
 		'showcase_id'    => '',
+		'bunny_library_id' => '',
+		'bunny_api_key'    => '',
+		'bunny_cdn_host'   => '',
 		'singular'       => 'Video',
 		'plural'         => 'Videos',
 		'slug'           => 'videos',
@@ -83,6 +96,43 @@ function svc_get_token() {
 	$settings = svc_get_settings();
 
 	return $settings['vimeo_token'];
+}
+
+/**
+ * Bunny Stream connection details. Constants in wp-config.php override the
+ * stored options: BUNNY_STREAM_LIBRARY_ID, BUNNY_STREAM_API_KEY,
+ * BUNNY_STREAM_CDN_HOST.
+ *
+ * @return array{library_id: string, api_key: string, cdn_host: string}
+ */
+function svc_bunny_config() {
+	$settings = svc_get_settings();
+
+	return array(
+		'library_id' => preg_replace( '/\D/', '', defined( 'BUNNY_STREAM_LIBRARY_ID' ) && BUNNY_STREAM_LIBRARY_ID ? (string) BUNNY_STREAM_LIBRARY_ID : (string) $settings['bunny_library_id'] ),
+		'api_key'    => defined( 'BUNNY_STREAM_API_KEY' ) && BUNNY_STREAM_API_KEY ? (string) BUNNY_STREAM_API_KEY : (string) $settings['bunny_api_key'],
+		'cdn_host'   => svc_sanitize_hostname( defined( 'BUNNY_STREAM_CDN_HOST' ) && BUNNY_STREAM_CDN_HOST ? BUNNY_STREAM_CDN_HOST : $settings['bunny_cdn_host'] ),
+	);
+}
+
+/**
+ * Whether Bunny Stream has the credentials it needs to be used at all.
+ */
+function svc_bunny_configured() {
+	$config = svc_bunny_config();
+
+	return '' !== $config['library_id'] && '' !== $config['api_key'];
+}
+
+/**
+ * Reduce input like "https://vz-abc.b-cdn.net/" to a bare hostname ('' if invalid).
+ */
+function svc_sanitize_hostname( $value ) {
+	$value = strtolower( trim( (string) $value ) );
+	$value = preg_replace( '#^[a-z]+://#', '', $value );
+	$value = preg_replace( '#[/?\#].*$#', '', $value );
+
+	return preg_match( '/^[a-z0-9.-]+$/', $value ) ? $value : '';
 }
 
 /**
@@ -116,35 +166,39 @@ function svc_format_duration( $seconds ) {
  * Render the video player.
  *
  * 'facade' (default): poster image + play button; assets/player.js swaps in
- * the Vimeo iframe on click. Fast, no third-party requests — used on list
+ * the provider's iframe on click. Fast, no third-party requests — used on list
  * pages and embeds.
  *
- * 'embed': the real Vimeo iframe, rendered immediately. Used on single video
+ * 'embed': the real player iframe, rendered immediately. Used on single video
  * pages so search engines see an actual player and classify them as watch
  * pages — a facade renders as div+img+button, i.e. no video at all to a
  * crawler that doesn't click.
  */
 function svc_render_player( $post_id, $mode = 'facade' ) {
-	$vimeo_id = get_post_meta( $post_id, '_vimeo_id', true );
-	if ( ! $vimeo_id ) {
+	$embed_url = SVC_Video::embed_url( $post_id );
+	if ( ! $embed_url ) {
 		return;
 	}
 
-	$title = get_the_title( $post_id );
+	$provider   = SVC_Video::provider( $post_id );
+	$title      = get_the_title( $post_id );
+	$dimensions = SVC_Video::dimensions( $post_id );
 
 	if ( 'embed' === $mode ) {
-		// width/height give the crawler's renderer an intrinsic 16:9 size
+		// width/height give the crawler's renderer the video's intrinsic size
 		// before CSS applies (instead of the 300×150 iframe default), and
 		// loading=eager + skip-lazy + data-no-lazy keep optimization plugins
 		// (WP Rocket/AccelerateWP, Jetpack, …) from rewriting src to a
 		// data-lazy-src placeholder — which would leave crawlers no player
 		// and fail Google's watch-page determination.
 		?>
-		<div class="svc-player svc-playing">
-			<iframe src="<?php echo esc_url( 'https://player.vimeo.com/video/' . rawurlencode( $vimeo_id ) . '?dnt=1' ); ?>"
+		<div<?php echo SVC_Video::box_attributes( $dimensions, 'svc-player svc-playing' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in box_attributes(). ?>>
+			<?php // data-autoplay-src: what player.js swaps in for visitors arriving from a "play on arrival" link (?play=1). ?>
+			<iframe src="<?php echo esc_url( $embed_url ); ?>"
+				data-autoplay-src="<?php echo esc_url( SVC_Video::embed_url( $post_id, true, true ) ); ?>"
 				title="<?php echo esc_attr( $title ); ?>"
-				width="1280" height="720" loading="eager" class="skip-lazy" data-no-lazy="1"
-				allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>
+				width="<?php echo (int) $dimensions[0]; ?>" height="<?php echo (int) $dimensions[1]; ?>" loading="eager" class="skip-lazy" data-no-lazy="1"
+				allow="autoplay; fullscreen; picture-in-picture; encrypted-media" allowfullscreen></iframe>
 		</div>
 		<?php
 		return;
@@ -152,7 +206,7 @@ function svc_render_player( $post_id, $mode = 'facade' ) {
 
 	$poster = get_the_post_thumbnail_url( $post_id, 'large' );
 	?>
-	<div class="svc-player" data-vimeo-id="<?php echo esc_attr( $vimeo_id ); ?>" data-title="<?php echo esc_attr( $title ); ?>">
+	<div<?php echo SVC_Video::box_attributes( $dimensions ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in box_attributes(). ?> data-provider="<?php echo esc_attr( $provider ); ?>" data-embed-src="<?php echo esc_url( SVC_Video::embed_url( $post_id, true ) ); ?>" data-title="<?php echo esc_attr( $title ); ?>">
 		<?php if ( $poster ) : ?>
 			<img class="svc-poster" src="<?php echo esc_url( $poster ); ?>" alt="<?php echo esc_attr( $title ); ?>">
 		<?php endif; ?>
@@ -167,7 +221,7 @@ function svc_render_player( $post_id, $mode = 'facade' ) {
 }
 
 /**
- * Format plain-text description content: Vimeo descriptions are plain text,
+ * Format plain-text description content: provider descriptions are plain text,
  * so escape, linkify URLs, and convert line breaks to paragraphs.
  */
 function svc_format_description_text( $text ) {
@@ -250,9 +304,14 @@ function svc_human_duration( $seconds ) {
  * Shared by the archive grid and the recirculation module.
  */
 function svc_render_tile( $tile_post ) {
-	$duration = svc_human_duration( get_post_meta( $tile_post->ID, '_vimeo_duration', true ) );
+	$duration = svc_human_duration( SVC_Video::duration( $tile_post->ID ) );
+
+	// A tall poster is shown whole, on a dark tile, rather than cropped to
+	// its middle strip.
+	$image = wp_get_attachment_metadata( get_post_thumbnail_id( $tile_post ) );
+	$tall  = is_array( $image ) && ! empty( $image['width'] ) && ! empty( $image['height'] ) && $image['height'] > $image['width'];
 	?>
-	<a href="<?php echo esc_url( get_permalink( $tile_post ) ); ?>" class="svc-thumbnail">
+	<a href="<?php echo esc_url( get_permalink( $tile_post ) ); ?>" class="svc-thumbnail<?php echo $tall ? ' svc-thumbnail--tall' : ''; ?>">
 		<?php if ( has_post_thumbnail( $tile_post ) ) : ?>
 			<?php echo get_the_post_thumbnail( $tile_post, 'medium_large', array( 'class' => 'svc-thumb-img', 'loading' => 'lazy' ) ); ?>
 		<?php endif; ?>
@@ -514,15 +573,16 @@ add_filter( 'rocket_lazyload_iframe_excluded_patterns', function ( $patterns ) {
 	$patterns   = is_array( $patterns ) ? $patterns : array();
 	$patterns[] = 'data-no-lazy';
 	$patterns[] = 'player.vimeo.com';
+	$patterns[] = 'player.mediadelivery.net';
 	return $patterns;
 } );
 
-// Single pages embed the Vimeo player immediately — warm the connections early.
+// Single pages embed the player immediately — warm the connections early.
 add_action( 'wp_head', function () {
 	if ( ! is_singular( SVC_Post_Type::POST_TYPE ) ) {
 		return;
 	}
-	foreach ( array( 'https://player.vimeo.com', 'https://i.vimeocdn.com', 'https://f.vimeocdn.com' ) as $svc_origin ) {
+	foreach ( SVC_Video::origins( SVC_Video::provider( get_queried_object_id() ) ) as $svc_origin ) {
 		printf( '<link rel="preconnect" href="%s" crossorigin>' . "\n", esc_url( $svc_origin ) );
 	}
 }, 3 );

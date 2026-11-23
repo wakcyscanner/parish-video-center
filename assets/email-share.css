@@ -1,0 +1,85 @@
+/* "Copy for email" dialog (wp-admin). */
+
+.svc-es-dialog {
+	width: min(560px, calc(100vw - 32px));
+	max-height: calc(100vh - 32px);
+	padding: 0;
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+	box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+}
+
+.svc-es-dialog::backdrop {
+	background: rgba(0, 0, 0, 0.6);
+}
+
+.svc-es-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 12px 16px;
+	border-bottom: 1px solid #dcdcde;
+}
+
+.svc-es-head h2 {
+	margin: 0;
+	font-size: 1.2em;
+}
+
+.svc-es-close {
+	font-size: 24px;
+	line-height: 1;
+	text-decoration: none;
+	padding: 0 6px;
+}
+
+.svc-es-body {
+	padding: 4px 16px 16px;
+}
+
+.svc-es-preview {
+	display: flex;
+	justify-content: center;
+	padding: 12px;
+	background: #f0f0f1;
+	border-radius: 4px;
+}
+
+.svc-es-preview img {
+	display: block;
+	width: auto;
+	height: auto;
+	max-width: 100%;
+	max-height: 46vh;
+	border-radius: 2px;
+}
+
+.svc-es-option {
+	display: block;
+	margin: 14px 0 8px;
+}
+
+.svc-es-address {
+	margin: 0 0 14px;
+	overflow-wrap: anywhere;
+}
+
+.svc-es-link {
+	font-size: 12px;
+}
+
+.svc-es-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.svc-es-notice {
+	margin: 10px 0 0;
+	color: #b32d2e;
+}
+
+.svc-es-notice:empty {
+	display: none;
+}

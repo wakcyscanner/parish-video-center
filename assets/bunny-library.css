@@ -1,0 +1,281 @@
+/* Bunny Stream library manager (wp-admin). */
+
+.svc-bl .page-title-action[disabled] {
+	opacity: 0.6;
+}
+
+.svc-bl-notices .notice {
+	margin: 12px 0 0;
+	position: relative;
+}
+
+.svc-bl-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+	margin: 14px 0 10px;
+}
+
+.svc-bl-toolbar input[type="search"] {
+	width: 260px;
+	max-width: 100%;
+}
+
+.svc-bl-count {
+	color: #50575e;
+}
+
+.svc-bl-sync {
+	margin-left: auto;
+}
+
+.svc-bl-table.is-loading {
+	opacity: 0.5;
+}
+
+.svc-bl-table table {
+	table-layout: auto;
+}
+
+.svc-bl-table th,
+.svc-bl-table td {
+	vertical-align: top;
+}
+
+.svc-bl-col-thumb {
+	width: 128px;
+}
+
+.svc-bl-thumb {
+	width: 128px;
+	aspect-ratio: 16 / 9;
+	background: #dcdcde;
+	border-radius: 3px;
+	overflow: hidden;
+}
+
+.svc-bl-thumb img {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.svc-bl-desc {
+	margin: 2px 0 0;
+	color: #50575e;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+	max-width: 60ch;
+}
+
+.svc-bl .button-link.svc-bl-danger {
+	color: #b32d2e;
+}
+
+.svc-bl-status {
+	display: inline-block;
+	padding: 2px 8px;
+	border-radius: 10px;
+	background: #f0f0f1;
+	white-space: nowrap;
+}
+
+.svc-bl-status.is-ready {
+	background: #edfaef;
+	color: #005c12;
+}
+
+.svc-bl-status.is-busy {
+	background: #fcf9e8;
+	color: #6e4e00;
+}
+
+.svc-bl-status.is-failed {
+	background: #fcf0f1;
+	color: #8a2424;
+}
+
+.svc-bl-pager .tablenav-pages {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	float: none;
+	justify-content: flex-end;
+}
+
+/* Upload panel */
+
+.svc-bl-upload {
+	margin-top: 14px;
+	padding: 4px 16px 16px;
+	background: #fff;
+	border: 1px solid #c3c4c7;
+}
+
+.svc-bl-drop {
+	padding: 18px;
+	border: 2px dashed #c3c4c7;
+	border-radius: 4px;
+	text-align: center;
+}
+
+.svc-bl-drop.is-over {
+	border-color: #2271b1;
+	background: #f0f6fc;
+}
+
+.svc-bl-queue {
+	margin: 12px 0 0;
+}
+
+.svc-bl-queue li {
+	padding: 10px 0;
+	border-top: 1px solid #f0f0f1;
+	margin: 0;
+}
+
+.svc-bl-queue__row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 10px;
+}
+
+.svc-bl-queue__row input[type="text"] {
+	flex: 1 1 280px;
+}
+
+.svc-bl-queue progress {
+	display: block;
+	width: 100%;
+	height: 10px;
+	margin: 8px 0 4px;
+}
+
+.svc-bl-queue__status.is-error,
+.svc-bl-form-message.is-error {
+	color: #b32d2e;
+}
+
+/* Dialogs */
+
+.svc-bl-dialog {
+	width: min(560px, calc(100vw - 32px));
+	padding: 0;
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+	box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+}
+
+.svc-bl-dialog--wide {
+	width: min(860px, calc(100vw - 32px));
+}
+
+.svc-bl-dialog::backdrop {
+	background: rgba(0, 0, 0, 0.6);
+}
+
+.svc-bl-dialog__head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 12px 16px;
+	border-bottom: 1px solid #dcdcde;
+}
+
+.svc-bl-dialog__head h2 {
+	margin: 0;
+	font-size: 1.2em;
+	overflow-wrap: anywhere;
+}
+
+.svc-bl-dialog__close {
+	font-size: 24px;
+	line-height: 1;
+	text-decoration: none;
+	padding: 0 6px;
+}
+
+.svc-bl-dialog__body {
+	padding: 16px;
+}
+
+.svc-bl-dialog__body form > label {
+	display: block;
+	margin-bottom: 12px;
+}
+
+.svc-bl-dialog__body label > span:first-child {
+	display: block;
+	margin-bottom: 4px;
+	font-weight: 600;
+}
+
+.svc-bl-thumb-field {
+	display: flex;
+	gap: 14px;
+	align-items: flex-start;
+}
+
+.svc-bl-thumb-field .description {
+	display: block;
+	margin-top: 4px;
+}
+
+.svc-bl-dialog__foot {
+	display: flex;
+	gap: 8px;
+	margin-top: 14px;
+}
+
+.svc-bl-inline-form {
+	display: flex;
+	gap: 8px;
+	margin-top: 14px;
+}
+
+.svc-bl-actions {
+	white-space: nowrap;
+	text-align: right;
+}
+
+.svc-bl-player {
+	position: relative;
+	aspect-ratio: 16 / 9;
+	background: #000;
+}
+
+.svc-bl-player iframe {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	border: 0;
+}
+
+/* Migrator */
+
+.svc-mig-controls {
+	padding-top: 8px;
+}
+
+.svc-mig-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px 14px;
+	margin: 8px 0;
+}
+
+.svc-mig-list {
+	margin: 0 0 12px;
+}
+
+.svc-mig-list li {
+	margin: 0 0 6px;
+}

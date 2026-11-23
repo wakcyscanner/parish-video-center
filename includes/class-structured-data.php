@@ -27,8 +27,8 @@ class SVC_Structured_Data {
 			return;
 		}
 
-		$vimeo_id = get_post_meta( $post->ID, '_vimeo_id', true );
-		if ( ! $vimeo_id ) {
+		$embed_url = SVC_Video::embed_url( $post->ID );
+		if ( ! $embed_url ) {
 			return;
 		}
 
@@ -41,7 +41,7 @@ class SVC_Structured_Data {
 			'description'     => wp_strip_all_tags( $post->post_content ),
 			'uploadDate'      => get_post_time( 'c', true, $post ),
 			// Identical to the iframe src so every signal names one URL.
-			'embedUrl'        => 'https://player.vimeo.com/video/' . $vimeo_id . '?dnt=1',
+			'embedUrl'        => $embed_url,
 			'url'             => get_permalink( $post ),
 			// Declares this a watch page: the video IS the page's main content.
 			'mainEntityOfPage' => array(
@@ -58,9 +58,9 @@ class SVC_Structured_Data {
 			),
 		);
 
-		// Direct .mp4 link when the Vimeo plan provides one — Google's
+		// Direct .mp4 link when the provider offers one — Google's
 		// preferred video fetch target, stronger than embedUrl alone.
-		$file_url = get_post_meta( $post->ID, '_vimeo_file_url', true );
+		$file_url = SVC_Video::file_url( $post->ID );
 		if ( $file_url ) {
 			$data['contentUrl'] = $file_url;
 		}
@@ -70,10 +70,14 @@ class SVC_Structured_Data {
 			$data['thumbnailUrl'] = array( $thumbnail );
 		}
 
-		$duration = svc_format_duration( get_post_meta( $post->ID, '_vimeo_duration', true ) );
+		$duration = svc_format_duration( SVC_Video::duration( $post->ID ) );
 		if ( $duration ) {
 			$data['duration'] = $duration;
 		}
+
+		list( $width, $height ) = SVC_Video::dimensions( $post->ID );
+		$data['width']          = $width;
+		$data['height']         = $height;
 
 		self::print_jsonld( $data );
 	}
